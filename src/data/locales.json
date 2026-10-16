@@ -1,0 +1,14 @@
+[
+  { "nombre": "Oficina", "renovaciones": 6 },
+  { "nombre": "Aula / sala de reuniones", "renovaciones": 8 },
+  { "nombre": "Bodega / almacén", "renovaciones": 6 },
+  { "nombre": "Taller mecánico", "renovaciones": 10 },
+  { "nombre": "Nave industrial / fábrica", "renovaciones": 8 },
+  { "nombre": "Cocina comercial", "renovaciones": 20 },
+  { "nombre": "Comedor / restaurante", "renovaciones": 10 },
+  { "nombre": "Gimnasio", "renovaciones": 10 },
+  { "nombre": "Baños / servicios sanitarios", "renovaciones": 12 },
+  { "nombre": "Lavandería", "renovaciones": 15 },
+  { "nombre": "Parqueo cubierto", "renovaciones": 8 },
+  { "nombre": "Zona de soldadura / pintura", "renovaciones": 20 }
+]

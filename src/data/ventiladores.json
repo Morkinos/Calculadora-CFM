@@ -1,0 +1,17 @@
+[
+  { "modelo": "XDF-45", "voltaje": 110, "potenciaW": 90, "caudalM3min": 65, "cfm": 2300, "ruidoMax": 55, "coberturaM2": 20 },
+  { "modelo": "50-FQ", "voltaje": 110, "potenciaW": 150, "caudalM3min": 96, "cfm": 3400, "ruidoMax": 71, "coberturaM2": 9.3 },
+  { "modelo": "50T-S", "voltaje": 110, "potenciaW": 145, "caudalM3min": 190, "cfm": 6700, "ruidoMax": 55, "coberturaM2": 28 },
+  { "modelo": "50T-W", "voltaje": 110, "potenciaW": 145, "caudalM3min": 190, "cfm": 6700, "ruidoMax": 55, "coberturaM2": 28 },
+  { "modelo": "AXIAL 9,5", "voltaje": 220, "potenciaW": 750, "caudalM3min": 530, "cfm": 18705, "ruidoMax": 60, "extraccion": true },
+  {
+    "modelo": "AXIAL 12,5", "voltaje": 220, "potenciaW": 750, "caudalM3min": 616.6667, "ruidoMax": 63, "extraccion": true,
+    "nota": "El Excel indica 37000 sin unidad (se interpretó m³/h) y potencia 0.75 (se interpretó kW). Confirmar con la ficha técnica."
+  },
+  { "modelo": "DF600", "voltaje": 110, "potenciaW": 200, "caudalM3min": 215, "cfm": 7600, "ruidoMax": 62, "coberturaM2": 56 },
+  { "modelo": "DF750", "voltaje": 110, "potenciaW": 280, "caudalM3min": 330, "cfm": 11647, "ruidoMax": 75, "coberturaM2": 78 },
+  { "modelo": "FE-18YE", "voltaje": 110, "potenciaW": 110, "caudalM3min": 84, "cfm": 2964, "ruidoMax": 62, "coberturaM2": 19 },
+  { "modelo": "FF-60M", "voltaje": 110, "potenciaW": 160, "caudalM3min": 230, "cfm": 8117, "ruidoMax": 70, "coberturaM2": 11 },
+  { "modelo": "FAD50-4 (AIP50)", "nombreMostrado": "AIP-500", "voltaje": 110, "potenciaW": 350, "caudalM3min": 95, "ruidoMax": 72, "extraccion": true },
+  { "modelo": "FAD60-4 (AIP60)", "nombreMostrado": "AIP-600", "voltaje": 110, "potenciaW": 600, "caudalM3min": 145, "ruidoMax": 78, "extraccion": true }
+]

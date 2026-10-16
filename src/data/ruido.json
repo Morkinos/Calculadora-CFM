@@ -1,0 +1,6 @@
+[
+  { "id": "libre", "etiqueta": "No hay personas (sin límite de ruido)", "maxDb": null },
+  { "id": "moderado", "etiqueta": "Sí, trabajando (hasta 70 dB)", "maxDb": 70 },
+  { "id": "bajo", "etiqueta": "Sí, con atención al público u oficina (hasta 60 dB)", "maxDb": 60 },
+  { "id": "personalizado", "etiqueta": "Personalizado", "maxDb": null }
+]
