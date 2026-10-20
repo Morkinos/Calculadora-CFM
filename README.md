@@ -1,4 +1,4 @@
-# Calculadora de ventiladores (CPEM)
+# Calculadora CFM (VEGGA)
 
 Página web en React + Vite. Todo el cálculo corre en el navegador: no hay servidor ni base de datos, así que cualquier número de personas puede usarla a la vez.
 
@@ -19,11 +19,11 @@ Suba el contenido de `dist/` a cualquier hosting estático: Netlify (arrastrar l
 
 ## Cómo editar los datos
 
-- **Catálogo de ventiladores:** `src/data/ventiladores.json`. Para agregar un modelo copie una línea y cambie los valores. `caudalM3min` es el caudal en m³/min; si solo tiene CFM, divida entre 35.31 (m³/min = CFM ÷ 35.31). `nota` es opcional y se muestra como advertencia.
-- **Renovaciones por tipo de local:** `src/data/locales.json`. Son valores típicos de referencia; cámbielos por los criterios de la empresa.
+- **Catálogo de ventiladores:** `src/data/ventiladores.json`. Para agregar un modelo copie una línea y cambie los valores. `cfm` es el caudal de la ficha (fuente del cálculo; si solo tiene m³/min multiplique por 35.31). `linea` es `industrial` o `domestica`. `nota` es opcional y se muestra como advertencia.
+- **Renovaciones por tipo de local:** `src/data/locales.json`. Cada local tiene `min` y `max` (tabla de VEGGA: bajo 4–6, medio 8–12, alto 15–30; almacén 5–10 según DIN 1946). La "media" es el promedio del rango, o el valor `media` si se define (almacén = 7). En la página el **nivel de calor** elige el valor del rango (Bajo = mínimo, Medio = media, Alto = máximo), o se escribe un valor manual.
 - **Colores y estilo:** `src/styles.css`. La paleta VEGGA está en las variables del inicio del archivo (`--naranja`, `--carbon`, etc.); cambiándolas se actualiza toda la página. El logo es por ahora el texto "VEGGA" (`src/components/Navbar.jsx` y `Footer.jsx`); se puede reemplazar por una imagen.
 - **Nombre que se muestra:** por defecto es `modelo`. Si el nombre comercial es distinto, agregue `nombreMostrado` (ej. AIP-600).
-- **Modelos que extraen / expulsan aire:** agregue `"extraccion": true` al modelo en `ventiladores.json`. Hoy están marcados AXIAL 9,5, AXIAL 12,5, AIP-500 y AIP-600 de forma PROVISIONAL; confirmar con el cliente.
+- **Modelos que extraen o inyectan aire:** agregue `"extraccion": true` y/o `"inyeccion": true` al modelo en `ventiladores.json`. Hoy solo `extraccion` está marcado, y de forma PROVISIONAL, en AXIAL 9,5, AXIAL 12,5, AIP-500 y AIP-600; `inyeccion` aún no está marcado en ningún modelo. Confirmar con el cliente.
 - **Niveles de ruido:** `src/data/ruido.json`. Cada nivel define un máximo de dB por unidad (hoy: moderado 70 dB, bajo 60 dB). El filtro usa el ruido máximo del catálogo (velocidad máxima).
 - **Lógica:** `src/lib/calculo.js`. Criterio de "más apto": menos unidades; a igual número, menor exceso de caudal. Cuando agreguen precios se puede añadir como segundo criterio.
 
@@ -32,4 +32,15 @@ Después de cambiar datos o lógica, ejecute `npm test` para comprobar que los r
 ## Pendientes por confirmar
 
 - AXIAL 12,5: el Excel original trae 37000 sin unidad y potencia 0.75; se interpretó m³/h y kW.
-- Factor de eficiencia por defecto: 80 % (ajustable en la página).
+- AXIAL 12,5: se usa 26.176 CFM (Excel nuevo); el valor 37000 sin unidad queda sin confirmar.
+- Dobles en el Excel (VP-16C) y ruidos inconsistentes en UR-623 y VO-16: ver `comentario` en el JSON.
+- AIP-500/AIP-600 no traen CFM: convertidos desde m³/min.
+
+## Cálculo (según las láminas de VEGGA)
+
+- Volumen (m³) = largo × ancho × altura. Si se indica altura mínima, se usa el promedio de la máxima y la mínima.
+- Q (m³/h) = volumen × renovaciones por hora (R/H). CFM = m³/h × 0.5886. l/s = m³/h ÷ 3.6.
+- Voltaje: 110 V y 120 V se tratan como la misma conexión (120 V). Opciones: Cualquiera, 120 V, 220 V.
+- Entrada de aire: si el local **tiene** entrada de aire, basta un inyector (el aire caliente sale por las aberturas). Si **no** la tiene, los modelos axiales (`"axial": true` en el catálogo) se instalan en pareja: un inyector y un extractor, cada uno con el caudal requerido (el doble de unidades; el caudal no se suma).
+- Caudal a cubrir (barra 65–125 %): 100 % = caudal requerido con 80 % de rendimiento del ventilador. Más de 100 % pide un poco más de aire.
+- Línea de ventiladores: Industrial (por defecto), Doméstica o Todas.

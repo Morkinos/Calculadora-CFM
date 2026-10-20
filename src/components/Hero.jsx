@@ -3,7 +3,6 @@ export default function Hero({ totalModelos }) {
     <section className="hero" id="inicio">
       <div className="contenedor hero-fila">
         <div className="hero-texto">
-          <span className="hero-etiqueta">Ventilación industrial</span>
           <h1>
             Calcule el ventilador <em>ideal</em> para su espacio
           </h1>

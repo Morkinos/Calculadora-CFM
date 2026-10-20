@@ -1,12 +1,13 @@
 import { nombreDe } from "../lib/calculo.js";
+import { IconoResultado } from "./Iconos.jsx";
 
 const n0 = new Intl.NumberFormat("es-CR", { maximumFractionDigits: 0 });
 const n1 = new Intl.NumberFormat("es-CR", { maximumFractionDigits: 1 });
 const pct = (x) => `${n0.format(x * 100)}%`;
 
-function Dato({ titulo, valor, unidad }) {
+function Dato({ titulo, valor, unidad, destacado }) {
   return (
-    <div className="dato">
+    <div className={destacado ? "dato dato-destacado" : "dato"}>
       <span className="dato-titulo">{titulo}</span>
       <span className="dato-valor">
         {valor} <small>{unidad}</small>
@@ -15,35 +16,49 @@ function Dato({ titulo, valor, unidad }) {
   );
 }
 
-export default function Resultados({ resultado, renovaciones, ruidoMaxDb }) {
+export default function Resultados({ resultado, renovaciones, ruidoMaxDb, entradaAire = true }) {
   const hayLimiteRuido = Number.isFinite(ruidoMaxDb);
+
   if (!resultado) {
     return (
-      <section className="tarjeta vacio" aria-live="polite">
+      <section className="tarjeta tarjeta-oscura vacio" aria-live="polite">
         <h2>Resultado</h2>
-        <p>Complete largo, ancho y alto del local para ver el modelo recomendado.</p>
+        <div className="vacio-contenido">
+          <span className="vacio-icono">
+            <IconoResultado />
+          </span>
+          <p className="vacio-titulo">Aquí verá el modelo recomendado</p>
+          <p>Complete largo, ancho y altura del local. El resultado se calcula al instante, con la cantidad de ventiladores necesaria.</p>
+          <ul className="vacio-lista">
+            <li>Largo y ancho en metros</li>
+            <li>Altura máxima (y mínima si el techo es inclinado)</li>
+            <li>Tipo de local y nivel de calor</li>
+          </ul>
+        </div>
       </section>
     );
   }
 
-  const { volumen, caudalRequerido, caudalRequeridoCfm, opciones } = resultado;
+  const { volumen, caudalRequerido, caudalRequeridoCfm, caudalRequeridoLps, opciones } = resultado;
   const [mejor, ...otras] = opciones;
+  const hayFuncion = otras.some((o) => o.extraccion || o.inyeccion);
 
   return (
-    <section className="tarjeta" aria-live="polite">
+    <section className="tarjeta tarjeta-oscura" aria-live="polite">
       <h2>Resultado</h2>
 
       <div className="datos">
+        <Dato titulo="Caudal requerido" valor={n0.format(caudalRequeridoCfm)} unidad="CFM" destacado />
+        <Dato titulo="Equivalente" valor={n0.format(caudalRequerido)} unidad="m³/h" />
         <Dato titulo="Volumen del local" valor={n1.format(volumen)} unidad="m³" />
         <Dato titulo="Renovaciones" valor={n1.format(renovaciones)} unidad="por hora" />
-        <Dato titulo="Caudal requerido" valor={n0.format(caudalRequerido)} unidad="m³/h" />
-        <Dato titulo="Equivalente" valor={n0.format(caudalRequeridoCfm)} unidad="CFM" />
       </div>
+      <p className="equivalencia">También equivale a {n0.format(caudalRequeridoLps)} l/s.</p>
 
       {!mejor ? (
         <p className="aviso">
-          Ningún modelo del catálogo cumple con el voltaje{hayLimiteRuido ? ` y el límite de ${n0.format(ruidoMaxDb)} dB` : ""}{" "}
-          seleccionados. Pruebe con otro voltaje{hayLimiteRuido ? " o un nivel de ruido más alto" : ""}.
+          Ningún modelo del catálogo cumple con los filtros seleccionados (voltaje, alcance
+          {hayLimiteRuido ? ` o límite de ${n0.format(ruidoMaxDb)} dB` : " o ruido"}). Pruebe cambiando alguno de ellos.
         </p>
       ) : (
         <>
@@ -52,11 +67,26 @@ export default function Resultados({ resultado, renovaciones, ruidoMaxDb }) {
             <p className="modelo">
               {nombreDe(mejor)} <span className="x">× {mejor.unidades}</span>
             </p>
-            {mejor.extraccion && <p className="detalle">✓ Sirve para extracción y expulsión de aire.</p>}
+            {mejor.preferida && (
+              <p className="detalle">★ Línea doméstica: es la preferida para este tipo de local por ser más fácil de instalar.</p>
+            )}
+            {mejor.enPareja && (
+              <p className="detalle">
+                ⇄ Pareja de axiales: {mejor.unidadesPorLado} {mejor.unidadesPorLado === 1 ? "inyector" : "inyectores"} +{" "}
+                {mejor.unidadesPorLado} {mejor.unidadesPorLado === 1 ? "extractor" : "extractores"} ({mejor.unidades} unidades en total).
+              </p>
+            )}
+            {mejor.axial && entradaAire && (
+              <p className="detalle">→ Se instala como inyector: el aire caliente sale por la entrada de aire del local.</p>
+            )}
+            {mejor.extraccion && <p className="detalle">✓ Sirve para extracción de aire.</p>}
+            {mejor.inyeccion && <p className="detalle">✓ Sirve para inyección de aire.</p>}
             <p className="detalle">
-              {mejor.unidades === 1 ? "1 unidad" : `${mejor.unidades} unidades`} · {n0.format(mejor.caudalTotal)} m³/h efectivos ·{" "}
-              {n1.format(mejor.renovacionesReales)} renovaciones/h reales · {n0.format(mejor.potenciaTotalW)} W en total ·{" "}
-              {mejor.voltaje} V{mejor.ruidoMax ? ` · hasta ${mejor.ruidoMax} dB` : ""}
+              {mejor.unidades === 1 ? "1 unidad" : `${mejor.unidades} unidades`} · {n0.format(mejor.caudalTotalCfm)} CFM efectivos
+              {mejor.enPareja ? " por lado" : ""} (
+              {n0.format(mejor.caudalTotal)} m³/h) · {n1.format(mejor.renovacionesReales)} renovaciones/h reales ·{" "}
+              {n0.format(mejor.potenciaTotalW)} W en total · {mejor.voltaje} V
+              {mejor.ruidoMax ? ` · hasta ${mejor.ruidoMax} dB` : ""}
             </p>
             {mejor.nota && <p className="nota">⚠ {mejor.nota}</p>}
             {hayLimiteRuido && (
@@ -76,11 +106,11 @@ export default function Resultados({ resultado, renovaciones, ruidoMaxDb }) {
                     <tr>
                       <th>Modelo</th>
                       <th>Cant.</th>
-                      <th>Caudal total (m³/h)</th>
+                      <th>Caudal total (CFM)</th>
                       <th>Exceso</th>
                       <th>Potencia (W)</th>
                       <th>Voltaje</th>
-                      <th>Extrae aire</th>
+                      {hayFuncion && <th>Función</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -90,12 +120,19 @@ export default function Resultados({ resultado, renovaciones, ruidoMaxDb }) {
                           {nombreDe(o)}
                           {o.nota && <span title={o.nota}> ⚠</span>}
                         </td>
-                        <td data-label="Cant.">{o.unidades}</td>
-                        <td data-label="Caudal total">{n0.format(o.caudalTotal)}</td>
+                        <td data-label="Cant.">
+                          {o.unidades}
+                          {o.enPareja ? ` (${o.unidadesPorLado}+${o.unidadesPorLado})` : ""}
+                        </td>
+                        <td data-label="Caudal total">{n0.format(o.caudalTotalCfm)}</td>
                         <td data-label="Exceso">{pct(o.exceso)}</td>
                         <td data-label="Potencia">{n0.format(o.potenciaTotalW)}</td>
                         <td data-label="Voltaje">{o.voltaje} V</td>
-                        <td data-label="Extrae aire">{o.extraccion ? "Sí" : "—"}</td>
+                        {hayFuncion && (
+                          <td data-label="Función">
+                            {[o.extraccion && "Extrae", o.inyeccion && "Inyecta"].filter(Boolean).join(" / ") || "—"}
+                          </td>
+                        )}
                       </tr>
                     ))}
                   </tbody>

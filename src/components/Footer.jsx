@@ -4,7 +4,7 @@ export default function Footer() {
       <div className="contenedor footer-fila">
         <div>
           <a className="logo" href="#inicio" aria-label="VEGGA, inicio">
-            VEG<span>GA</span>
+            VEGGA
           </a>
           <p className="footer-nota">
             El cálculo es una guía de selección. Con ductos, rejillas o filtros el caudal real es menor que el de catálogo.
