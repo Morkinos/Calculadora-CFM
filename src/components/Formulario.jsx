@@ -7,6 +7,13 @@ const NIVELES_CALOR = [
   ["alto", "Alto"],
 ];
 
+const ALCANCES = [
+  ["cualquiera", "Cualquiera"],
+  ["extraccion", "Extracción"],
+  ["inyeccion", "Inyección"],
+  ["ambas", "Ambas"],
+];
+
 const LINEAS = [
   ["industrial", "Industrial"],
   ["domestica", "Doméstica"],
@@ -25,7 +32,7 @@ function Campo({ id, etiqueta, ayuda, children }) {
 
 const fmt = (n) => String(n).replace(".", ",");
 
-export default function Formulario({ form, setForm, locales, nivelesRuido, renovaciones, onLimpiar }) {
+export default function Formulario({ form, setForm, locales, nivelesRuido, contaminantes, factorContaminante, renovaciones, onLimpiar }) {
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const num = (k) => ({
     type: "text",
@@ -129,8 +136,8 @@ export default function Formulario({ form, setForm, locales, nivelesRuido, renov
         </div>
         <small>
           Más calor = más renovaciones por hora dentro del rango del local, para refrescar más con las mismas medidas.
-          Renovaciones usadas: <strong>{Number.isFinite(renovaciones) ? fmt(renovaciones) : "—"}</strong> por hora
-          {usaManual ? " (valor manual)" : ""}
+          Renovaciones usadas: <strong>{Number.isFinite(renovaciones) ? fmt(Math.round(renovaciones * 10) / 10) : "—"}</strong> por hora
+          {usaManual ? " (valor manual)" : ""}{factorContaminante > 1 ? ` · incluye ×${fmt(factorContaminante)} por contaminantes` : ""}
         </small>
       </div>
 
@@ -149,15 +156,45 @@ export default function Formulario({ form, setForm, locales, nivelesRuido, renov
         </select>
       </Campo>
 
+      <div className="campo">
+        <span className="etiqueta-campo" id="t-funcion">
+          Alcance requerido
+        </span>
+        <div className="segmentado segmentado-4" role="group" aria-labelledby="t-funcion">
+          {ALCANCES.map(([id, texto]) => (
+            <button
+              type="button"
+              key={id}
+              aria-pressed={form.funcion === id}
+              className={form.funcion === id ? "activo" : ""}
+              onClick={() => setForm((f) => ({ ...f, funcion: id }))}
+            >
+              {texto}
+            </button>
+          ))}
+        </div>
+        <small>
+          {form.funcion === "ambas"
+            ? "Ambas: se recomienda una pareja (un inyector + un extractor) con modelos que pueden hacer las dos funciones."
+            : "Extracción o inyección: solo modelos marcados para esa función en el catálogo."}
+        </small>
+      </div>
+
       <Campo
-        id="funcion"
-        etiqueta="Alcance requerido"
-        ayuda="Extracción o inyección: solo modelos marcados para esa función en el catálogo."
+        id="contaminante"
+        etiqueta="¿Hay contaminantes en el local?"
+        ayuda={
+          factorContaminante > 1
+            ? `Se multiplican las renovaciones por hora ×${fmt(factorContaminante)} (criterio estimado).`
+            : "Humo, vapores, polvo, gases o químicos requieren más renovaciones de aire."
+        }
       >
-        <select id="funcion" value={form.funcion} onChange={set("funcion")}>
-          <option value="cualquiera">Cualquiera</option>
-          <option value="extraccion">Extracción de aire</option>
-          <option value="inyeccion">Inyección de aire</option>
+        <select id="contaminante" value={form.contaminante} onChange={set("contaminante")}>
+          {contaminantes.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.etiqueta}
+            </option>
+          ))}
         </select>
       </Campo>
 
@@ -174,6 +211,16 @@ export default function Formulario({ form, setForm, locales, nivelesRuido, renov
           ))}
         </select>
       </Campo>
+
+      {form.ruido !== "libre" && (
+        <Campo
+          id="personas"
+          etiqueta="Cantidad de personas (aprox.)"
+          ayuda="Las personas consumen aire y lo contaminan: se suma el aire de ventilación por persona (referencia ASHRAE 62.1) al de las renovaciones."
+        >
+          <input id="personas" {...num("personas")} placeholder="Ej. 20" />
+        </Campo>
+      )}
 
       {form.ruido === "personalizado" && (
         <Campo id="ruidoPersonalizado" etiqueta="Ruido máximo permitido (dB)">

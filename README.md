@@ -23,7 +23,7 @@ Suba el contenido de `dist/` a cualquier hosting estático: Netlify (arrastrar l
 - **Renovaciones por tipo de local:** `src/data/locales.json`. Cada local tiene `min` y `max` (tabla de VEGGA: bajo 4–6, medio 8–12, alto 15–30; almacén 5–10 según DIN 1946). La "media" es el promedio del rango, o el valor `media` si se define (almacén = 7). En la página el **nivel de calor** elige el valor del rango (Bajo = mínimo, Medio = media, Alto = máximo), o se escribe un valor manual.
 - **Colores y estilo:** `src/styles.css`. La paleta VEGGA está en las variables del inicio del archivo (`--naranja`, `--carbon`, etc.); cambiándolas se actualiza toda la página. El logo es por ahora el texto "VEGGA" (`src/components/Navbar.jsx` y `Footer.jsx`); se puede reemplazar por una imagen.
 - **Nombre que se muestra:** por defecto es `modelo`. Si el nombre comercial es distinto, agregue `nombreMostrado` (ej. AIP-600).
-- **Modelos que extraen o inyectan aire:** agregue `"extraccion": true` y/o `"inyeccion": true` al modelo en `ventiladores.json`. Hoy solo `extraccion` está marcado, y de forma PROVISIONAL, en AXIAL 9,5, AXIAL 12,5, AIP-500 y AIP-600; `inyeccion` aún no está marcado en ningún modelo. Confirmar con el cliente.
+- **Modelos que extraen o inyectan aire:** agregue `"extraccion": true` y/o `"inyeccion": true` al modelo en `ventiladores.json`. Provisional; confirmar con el cliente.
 - **Niveles de ruido:** `src/data/ruido.json`. Cada nivel define un máximo de dB por unidad (hoy: moderado 70 dB, bajo 60 dB). El filtro usa el ruido máximo del catálogo (velocidad máxima).
 - **Lógica:** `src/lib/calculo.js`. Criterio de "más apto": menos unidades; a igual número, menor exceso de caudal. Cuando agreguen precios se puede añadir como segundo criterio.
 
@@ -44,3 +44,12 @@ Después de cambiar datos o lógica, ejecute `npm test` para comprobar que los r
 - Entrada de aire: si el local **tiene** entrada de aire, basta un inyector (el aire caliente sale por las aberturas). Si **no** la tiene, los modelos axiales (`"axial": true` en el catálogo) se instalan en pareja: un inyector y un extractor, cada uno con el caudal requerido (el doble de unidades; el caudal no se suma).
 - Caudal a cubrir (barra 65–125 %): 100 % = caudal requerido con 80 % de rendimiento del ventilador. Más de 100 % pide un poco más de aire.
 - Línea de ventiladores: Industrial (por defecto), Doméstica o Todas.
+
+## Novedades (20 oct)
+
+- **Alcance requerido** en botones: Cualquiera / Extracción / Inyección / Ambas. "Ambas" recomienda una pareja (inyector + extractor) con modelos marcados `extraccion` e `inyeccion`. Marcas actuales (PROVISIONALES): AXIAL y AIP (axiales) = ambas; el resto = solo inyección.
+- **Elegir modelo:** en "Otras opciones", el botón Elegir lo muestra como resultado principal.
+- **Contaminantes:** `src/data/contaminantes.json` (factor que multiplica las renovaciones: leve ×1,25, moderado ×1,5, alto ×2; criterio estimado, por confirmar).
+- **Personas:** `rpp` (m³/h por persona) y `rm2` (m³/h por m²) en `locales.json` (IMC/ASHRAE 62.1); el aire por personas se SUMA al de renovaciones.
+- **Renovaciones:** valores DIN 1946 (Casals/Soler&Palau); por defecto se usa el máximo del rango (Nivel de calor = Alto).
+- **Caudal requerido vs. brindado:** el resultado compara ambos (CFM) y muestra el 100 % de catálogo.

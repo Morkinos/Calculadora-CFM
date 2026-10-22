@@ -1,41 +1,22 @@
 [
-  { "modelo": "XDF-45", "linea": "industrial", "voltaje": 110, "potenciaW": 90, "cfm": 2300, "ruidoMax": 55, "coberturaM2": 20 },
-  { "modelo": "50-FQ", "linea": "industrial", "voltaje": 110, "potenciaW": 150, "cfm": 3400, "ruidoMax": 71, "coberturaM2": 9.3 },
-  { "modelo": "50T-S", "linea": "industrial", "voltaje": 110, "potenciaW": 145, "cfm": 6700, "ruidoMax": 55, "coberturaM2": 28 },
-  { "modelo": "50T-W", "linea": "industrial", "voltaje": 110, "potenciaW": 145, "cfm": 6700, "ruidoMax": 55, "coberturaM2": 28 },
-  { "modelo": "AXIAL 9,5", "linea": "industrial", "voltaje": 220, "potenciaW": 750, "cfm": 18705, "ruidoMax": 60, "extraccion": true, "axial": true },
-  {
-    "modelo": "AXIAL 12,5", "linea": "industrial", "voltaje": 220, "potenciaW": 750, "cfm": 26176, "ruidoMax": 63, "extraccion": true, "axial": true,
-    "nota": "Pendiente de confirmar: el Excel trae 26,176 CFM y también 37000 sin unidad (≈21,780 CFM si fuera m³/h). Se usa 26,176 CFM. La potencia dice 0.75 y se tomó como 750 W."
-  },
-  { "modelo": "DF600", "linea": "industrial", "voltaje": 110, "potenciaW": 200, "cfm": 7600, "ruidoMax": 62, "coberturaM2": 56 },
-  { "modelo": "DF750", "linea": "industrial", "voltaje": 110, "potenciaW": 280, "cfm": 11647, "ruidoMax": 75, "coberturaM2": 78 },
-  { "modelo": "FE-18YE", "linea": "industrial", "voltaje": 110, "potenciaW": 110, "cfm": 2964, "ruidoMax": 62, "coberturaM2": 19 },
-  { "modelo": "FF-60M", "linea": "industrial", "voltaje": 110, "potenciaW": 160, "cfm": 8117, "ruidoMax": 70, "coberturaM2": 11 },
-  {
-    "modelo": "FAD50-4 (AIP50)", "nombreMostrado": "AIP-500", "linea": "industrial", "voltaje": 110, "potenciaW": 350, "cfm": 3355, "ruidoMax": 72, "extraccion": true,
-    "comentario": "El Excel no trae CFM; convertido de 95 m³/min (×35.3147)."
-  },
-  {
-    "modelo": "FAD60-4 (AIP60)", "nombreMostrado": "AIP-600", "linea": "industrial", "voltaje": 110, "potenciaW": 600, "cfm": 5121, "ruidoMax": 78, "extraccion": true,
-    "comentario": "El Excel no trae CFM; convertido de 145 m³/min (×35.3147)."
-  },
-
-  { "modelo": "LF-18", "linea": "domestica", "voltaje": 120, "potenciaW": 90, "cfm": 2118, "ruidoMax": 68 },
-  {
-    "modelo": "VP-16C", "linea": "domestica", "voltaje": 120, "potenciaW": 60, "cfm": 1765, "ruidoMax": 65,
-    "comentario": "VP-16C aparece dos veces en el Excel con el mismo CFM; ruido máximo 65 dB en una y 60 dB en la otra. Se usó 65 dB."
-  },
-  { "modelo": "FS-40", "linea": "domestica", "voltaje": 120, "potenciaW": 44, "cfm": 1236, "ruidoMax": 65 },
-  { "modelo": "FS-45", "linea": "domestica", "voltaje": 120, "potenciaW": 60, "cfm": 1589, "ruidoMax": 63 },
-  { "modelo": "TF-40", "linea": "domestica", "voltaje": 120, "potenciaW": 60, "cfm": 883, "comentario": "Sin dato de ruido en el Excel." },
-  {
-    "modelo": "UR-623", "linea": "domestica", "voltaje": 120, "potenciaW": 75, "cfm": 6886, "ruidoMax": 68,
-    "comentario": "El Excel trae 68 dB mínima y 40 dB máxima (inconsistente). Se usó 68 dB."
-  },
-  {
-    "modelo": "VO-16", "linea": "domestica", "voltaje": 120, "potenciaW": 60, "cfm": 2118, "ruidoMax": 62,
-    "comentario": "El Excel trae <62 dB mínima y <52 dB máxima (inconsistente). Se usó 62 dB."
-  },
-  { "modelo": "VP-16CR", "linea": "domestica", "voltaje": 120, "potenciaW": 55, "cfm": 1942, "ruidoMax": 62 }
+  {"modelo": "XDF-45", "linea": "industrial", "voltaje": 110, "potenciaW": 90, "cfm": 2300, "ruidoMax": 55, "coberturaM2": 20, "inyeccion": true},
+  {"modelo": "50-FQ", "linea": "industrial", "voltaje": 110, "potenciaW": 150, "cfm": 3400, "ruidoMax": 71, "coberturaM2": 9.3, "inyeccion": true},
+  {"modelo": "50T-S", "linea": "industrial", "voltaje": 110, "potenciaW": 145, "cfm": 6700, "ruidoMax": 55, "coberturaM2": 28, "inyeccion": true},
+  {"modelo": "50T-W", "linea": "industrial", "voltaje": 110, "potenciaW": 145, "cfm": 6700, "ruidoMax": 55, "coberturaM2": 28, "inyeccion": true},
+  {"modelo": "AXIAL 9,5", "linea": "industrial", "voltaje": 220, "potenciaW": 750, "cfm": 18705, "ruidoMax": 60, "extraccion": true, "axial": true, "inyeccion": true},
+  {"modelo": "AXIAL 12,5", "linea": "industrial", "voltaje": 220, "potenciaW": 750, "cfm": 26176, "ruidoMax": 63, "extraccion": true, "axial": true, "nota": "Pendiente de confirmar: el Excel trae 26,176 CFM y también 37000 sin unidad (≈21,780 CFM si fuera m³/h). Se usa 26,176 CFM. La potencia dice 0.75 y se tomó como 750 W.", "inyeccion": true},
+  {"modelo": "DF600", "linea": "industrial", "voltaje": 110, "potenciaW": 200, "cfm": 7600, "ruidoMax": 62, "coberturaM2": 56, "inyeccion": true},
+  {"modelo": "DF750", "linea": "industrial", "voltaje": 110, "potenciaW": 280, "cfm": 11647, "ruidoMax": 75, "coberturaM2": 78, "inyeccion": true},
+  {"modelo": "FE-18YE", "linea": "industrial", "voltaje": 110, "potenciaW": 110, "cfm": 2964, "ruidoMax": 62, "coberturaM2": 19, "inyeccion": true},
+  {"modelo": "FF-60M", "linea": "industrial", "voltaje": 110, "potenciaW": 160, "cfm": 8117, "ruidoMax": 70, "coberturaM2": 11, "inyeccion": true},
+  {"modelo": "FAD50-4 (AIP50)", "nombreMostrado": "AIP-500", "linea": "industrial", "voltaje": 110, "potenciaW": 350, "cfm": 3355, "ruidoMax": 72, "extraccion": true, "comentario": "El Excel no trae CFM; convertido de 95 m³/min (×35.3147).", "axial": true, "inyeccion": true},
+  {"modelo": "FAD60-4 (AIP60)", "nombreMostrado": "AIP-600", "linea": "industrial", "voltaje": 110, "potenciaW": 600, "cfm": 5121, "ruidoMax": 78, "extraccion": true, "comentario": "El Excel no trae CFM; convertido de 145 m³/min (×35.3147).", "axial": true, "inyeccion": true},
+  {"modelo": "LF-18", "linea": "domestica", "voltaje": 120, "potenciaW": 90, "cfm": 2118, "ruidoMax": 68, "inyeccion": true},
+  {"modelo": "VP-16C", "linea": "domestica", "voltaje": 120, "potenciaW": 60, "cfm": 1765, "ruidoMax": 65, "comentario": "VP-16C aparece dos veces en el Excel con el mismo CFM; ruido máximo 65 dB en una y 60 dB en la otra. Se usó 65 dB.", "inyeccion": true},
+  {"modelo": "FS-40", "linea": "domestica", "voltaje": 120, "potenciaW": 44, "cfm": 1236, "ruidoMax": 65, "inyeccion": true},
+  {"modelo": "FS-45", "linea": "domestica", "voltaje": 120, "potenciaW": 60, "cfm": 1589, "ruidoMax": 63, "inyeccion": true},
+  {"modelo": "TF-40", "linea": "domestica", "voltaje": 120, "potenciaW": 60, "cfm": 883, "comentario": "Sin dato de ruido en el Excel.", "inyeccion": true},
+  {"modelo": "UR-623", "linea": "domestica", "voltaje": 120, "potenciaW": 75, "cfm": 6886, "ruidoMax": 68, "comentario": "El Excel trae 68 dB mínima y 40 dB máxima (inconsistente). Se usó 68 dB.", "inyeccion": true},
+  {"modelo": "VO-16", "linea": "domestica", "voltaje": 120, "potenciaW": 60, "cfm": 2118, "ruidoMax": 62, "comentario": "El Excel trae <62 dB mínima y <52 dB máxima (inconsistente). Se usó 62 dB.", "inyeccion": true},
+  {"modelo": "VP-16CR", "linea": "domestica", "voltaje": 120, "potenciaW": 55, "cfm": 1942, "ruidoMax": 62, "inyeccion": true}
 ]

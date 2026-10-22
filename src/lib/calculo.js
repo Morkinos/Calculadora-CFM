@@ -6,13 +6,6 @@ export const LPS_POR_M3H = 1 / 3.6; // 1 m³/h = 0.2778 l/s
 // Rendimiento real supuesto de un ventilador respecto a su caudal de catálogo (instalación, rejillas, etc.).
 export const RENDIMIENTO_VENTILADOR = 0.8;
 
-/**
- * Convierte el "caudal a cubrir" de la página (65 % a 125 %, 100 % por defecto) en el factor que se
- * aplica al caudal de catálogo. 100 % = caudal requerido con el rendimiento del 80 %; más de 100 %
- * pide un poco más de aire (más ventiladores o un modelo mayor); menos de 100 %, un poco menos.
- */
-export const eficienciaDe = (coberturaPct) => RENDIMIENTO_VENTILADOR / (coberturaPct / 100);
-
 // Si el tipo de local prefiere una línea (ej. doméstica, más fácil de instalar), sus modelos van primero
 // siempre que no necesiten más de este número de unidades; si necesitan más, gana el criterio normal.
 export const MAX_UNIDADES_PREFERIDA = 6;
@@ -44,13 +37,16 @@ export function renovacionesDe(local, nivel = "medio") {
  *   altoMin (opcional, m): si se indica, el volumen usa el promedio de ambas alturas (techo inclinado)
  *   renovaciones (por hora) · voltaje ("Cualquiera" | "120V" | "220V")
  *   linea (por defecto "industrial"): "industrial" | "domestica" | "todas"
- *   eficiencia (0.3 a 1.5): caudal real = caudal de catálogo × eficiencia (ver eficienciaDe)
+ *   eficiencia (por defecto 0.8): caudal real de cada unidad = caudal de catálogo × eficiencia
+ *   margen (por defecto 1): "caudal a cubrir"; se dimensiona para caudal requerido × margen (1.25 = 25 % más de aire)
+ *   personas, m3hPorPersona, m3hPorM2: aire adicional por ocupantes (se suma al de renovaciones)
  *   entradaAire (por defecto true): si el local tiene entrada/aberturas de aire, el aire caliente sale por
  *     ellas y basta un inyector. Si es false, los modelos axiales (axial: true) se instalan en pareja:
  *     un inyector y un extractor, cada uno con el caudal requerido (el doble de unidades).
  *   ruidoMaxDb (opcional): excluye modelos cuyo ruido máximo por unidad supere este valor
  *   preferirLinea (opcional): "domestica" | "industrial"; prioriza esa línea (hasta MAX_UNIDADES_PREFERIDA unidades)
- *   funcion (opcional): "cualquiera" (por defecto), "extraccion" o "inyeccion"
+ *   funcion (opcional): "cualquiera" (por defecto), "extraccion", "inyeccion" o "ambas"
+ *     ("ambas": modelos que pueden las dos funciones, en pareja: un inyector + un extractor)
  *     (solo modelos con extraccion: true / inyeccion: true en el catálogo)
  * @param {Array} catalogo  lista de ventiladores (ver data/ventiladores.json)
  * @returns {null | {volumen, caudalRequerido, caudalRequeridoCfm, caudalRequeridoLps, opciones}}
@@ -66,7 +62,11 @@ export function calcular(entrada, catalogo) {
     renovaciones,
     voltaje = "Cualquiera",
     linea = "industrial",
-    eficiencia = 1,
+    eficiencia = RENDIMIENTO_VENTILADOR,
+    margen = 1,
+    personas = 0,
+    m3hPorPersona = 0,
+    m3hPorM2 = 0,
     ruidoMaxDb = Infinity,
     funcion = "cualquiera",
     entradaAire = true,
@@ -78,22 +78,26 @@ export function calcular(entrada, catalogo) {
 
   const altoUsado = Number.isFinite(altoMin) && altoMin > 0 ? (alto + altoMin) / 2 : alto;
   const volumen = largo * ancho * altoUsado;
-  const caudalRequerido = volumen * renovaciones; // m³/h  (Q = V · R/H)
+  const caudalRenovaciones = volumen * renovaciones; // m³/h  (Q = V · R/H)
+  // Aire adicional por ocupantes (aire exterior mínimo por persona + por m², tipo ASHRAE 62.1). Se suma al de renovaciones.
+  const hayPersonas = Number.isFinite(personas) && personas > 0;
+  const caudalPersonas = hayPersonas ? personas * m3hPorPersona + largo * ancho * m3hPorM2 : 0;
+  const caudalRequerido = caudalRenovaciones + caudalPersonas;
 
   const opciones = catalogo
     .filter((f) => caudalCatalogoM3h(f) > 0)
     .filter((f) => linea === "todas" || (f.linea ?? "industrial") === linea)
     .filter((f) => voltaje === "Cualquiera" || `${voltajeNominal(f)}V` === voltaje)
-    // Función requerida: solo modelos marcados para extraer / inyectar aire.
-    .filter((f) => funcion === "cualquiera" || f[funcion] === true)
+    // Función requerida: solo modelos marcados para extraer / inyectar aire. "ambas" = el modelo debe poder hacer las dos.
+    .filter((f) => funcion === "cualquiera" || (funcion === "ambas" ? f.extraccion === true && f.inyeccion === true : f[funcion] === true))
     // Límite de ruido por unidad (dB a velocidad máxima). Sin dato de ruido no se puede garantizar el límite.
     .filter((f) => ruidoMaxDb === Infinity || (f.ruidoMax != null && f.ruidoMax <= ruidoMaxDb))
     .map((f) => {
       const caudalUnidad = caudalCatalogoM3h(f) * eficiencia; // m³/h reales por unidad
       // Unidades necesarias para mover el caudal requerido por un lado (inyección o extracción).
-      const unidadesPorLado = Math.max(1, Math.ceil(caudalRequerido / caudalUnidad - 1e-9));
+      const unidadesPorLado = Math.max(1, Math.ceil((caudalRequerido * margen) / caudalUnidad - 1e-9));
       // Sin entrada de aire, los axiales van en pareja: mismas unidades para inyectar y para extraer.
-      const enPareja = f.axial === true && entradaAire === false;
+      const enPareja = funcion === "ambas" || (f.axial === true && entradaAire === false);
       const unidades = enPareja ? unidadesPorLado * 2 : unidadesPorLado;
       const caudalTotal = unidadesPorLado * caudalUnidad; // caudal de cada lado (no se suman)
       return {
@@ -104,6 +108,7 @@ export function calcular(entrada, catalogo) {
         enPareja,
         caudalTotal,
         caudalTotalCfm: caudalTotal * CFM_POR_M3H,
+        caudalCatalogoCfm: unidadesPorLado * caudalCatalogoM3h(f) * CFM_POR_M3H, // 100 % de catálogo, por lado
         exceso: caudalTotal / caudalRequerido - 1,
         preferida: preferirLinea != null && (f.linea ?? "industrial") === preferirLinea && unidades <= MAX_UNIDADES_PREFERIDA,
         potenciaTotalW: unidades * f.potenciaW,
@@ -115,6 +120,8 @@ export function calcular(entrada, catalogo) {
   return {
     volumen,
     caudalRequerido,
+    caudalRenovaciones,
+    caudalPersonas,
     caudalRequeridoCfm: caudalRequerido * CFM_POR_M3H,
     caudalRequeridoLps: caudalRequerido * LPS_POR_M3H,
     opciones,

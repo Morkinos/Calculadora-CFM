@@ -2,7 +2,8 @@ import { useMemo, useState } from "react";
 import ventiladores from "./data/ventiladores.json";
 import locales from "./data/locales.json";
 import nivelesRuido from "./data/ruido.json";
-import { calcular, aNumero, renovacionesDe, eficienciaDe } from "./lib/calculo.js";
+import contaminantes from "./data/contaminantes.json";
+import { calcular, aNumero, renovacionesDe, RENDIMIENTO_VENTILADOR } from "./lib/calculo.js";
 import Navbar from "./components/Navbar.jsx";
 import Hero from "./components/Hero.jsx";
 import Formulario from "./components/Formulario.jsx";
@@ -16,7 +17,9 @@ const INICIAL = {
   alto: "", // altura máxima
   altoMin: "", // altura mínima (opcional)
   local: locales[0].nombre,
-  calor: "medio", // "bajo" | "medio" | "alto": mínimo, media o máximo del rango de renovaciones
+  calor: "alto", // "bajo" | "medio" | "alto": mínimo, media o máximo del rango de renovaciones (por defecto el máximo)
+  contaminante: "ninguno", // ver data/contaminantes.json: multiplica las renovaciones por hora
+  personas: "", // cantidad aproximada de personas (opcional)
   entradaAire: "si", // "si" | "no"
   renovacionesManual: "",
   voltaje: "Cualquiera",
@@ -30,12 +33,19 @@ const INICIAL = {
 export default function App() {
   const [form, setForm] = useState(INICIAL);
 
+  const local = useMemo(() => locales.find((l) => l.nombre === form.local), [form.local]);
+
+  const factorContaminante = contaminantes.find((c) => c.id === form.contaminante)?.factor ?? 1;
+
+  // Renovaciones por hora: base (manual o por tipo de local y nivel de calor) × factor por contaminantes.
   const renovaciones = useMemo(() => {
     const manual = aNumero(form.renovacionesManual);
-    if (Number.isFinite(manual) && manual > 0) return manual;
-    const local = locales.find((l) => l.nombre === form.local);
-    return local ? renovacionesDe(local, form.calor) : NaN;
-  }, [form.local, form.calor, form.renovacionesManual]);
+    const base = Number.isFinite(manual) && manual > 0 ? manual : local ? renovacionesDe(local, form.calor) : NaN;
+    return base * factorContaminante;
+  }, [local, form.calor, form.renovacionesManual, factorContaminante]);
+
+  // Personas: solo cuentan si el usuario indicó que hay personas en el local.
+  const personas = form.ruido !== "libre" ? aNumero(form.personas) : NaN;
 
   // Límite de ruido por unidad en dB (Infinity = sin límite).
   const ruidoMaxDb = useMemo(() => {
@@ -46,7 +56,7 @@ export default function App() {
     return nivelesRuido.find((r) => r.id === form.ruido)?.maxDb ?? Infinity;
   }, [form.ruido, form.ruidoPersonalizado]);
 
-  const preferirLinea = useMemo(() => locales.find((l) => l.nombre === form.local)?.preferencia ?? null, [form.local]);
+  const preferirLinea = local?.preferencia ?? null;
 
   const resultado = useMemo(
     () =>
@@ -60,14 +70,18 @@ export default function App() {
           voltaje: form.voltaje,
           linea: form.linea,
           preferirLinea,
-          eficiencia: eficienciaDe(form.cobertura),
+          eficiencia: RENDIMIENTO_VENTILADOR,
+          margen: form.cobertura / 100,
+          personas,
+          m3hPorPersona: local?.rpp ?? 0,
+          m3hPorM2: local?.rm2 ?? 0,
           ruidoMaxDb,
           funcion: form.funcion,
           entradaAire: form.entradaAire === "si",
         },
         ventiladores
       ),
-    [form, renovaciones, ruidoMaxDb, preferirLinea]
+    [form, renovaciones, ruidoMaxDb, preferirLinea, personas, local]
   );
 
   return (
@@ -83,6 +97,8 @@ export default function App() {
               setForm={setForm}
               locales={locales}
               nivelesRuido={nivelesRuido}
+              contaminantes={contaminantes}
+              factorContaminante={factorContaminante}
               renovaciones={renovaciones}
               onLimpiar={() => setForm(INICIAL)}
             />
@@ -90,13 +106,15 @@ export default function App() {
               resultado={resultado}
               renovaciones={renovaciones}
               ruidoMaxDb={ruidoMaxDb}
+              funcion={form.funcion}
               entradaAire={form.entradaAire === "si"}
             />
           </div>
           <p className="formula">
             Volumen (m³) = largo × ancho × alto · Caudal requerido Q (m³/h) = volumen × renovaciones por hora (R/H) · CFM = m³/h × 0.5886 ·
-            Unidades = (caudal requerido × caudal a cubrir) ÷ (CFM de catálogo × 80 % de rendimiento), redondeado hacia arriba. Las renovaciones por
-            tipo de local son aproximadas (tabla de VEGGA y DIN 1946 para almacenes).
+            Unidades = (caudal requerido × caudal a cubrir) ÷ (CFM de catálogo × 80 % de rendimiento), redondeado hacia arriba. Con personas se suma el
+            aire de ventilación por ocupante (ASHRAE 62.1) y con contaminantes se multiplican las renovaciones. Las renovaciones por tipo
+            de local son valores de referencia (DIN 1946); por defecto se usa el máximo del rango.
           </p>
         </section>
 

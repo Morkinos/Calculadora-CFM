@@ -1,0 +1,6 @@
+[
+  { "id": "ninguno", "etiqueta": "Ninguno", "factor": 1 },
+  { "id": "leve", "etiqueta": "Leve (olores, polvo ligero)", "factor": 1.25 },
+  { "id": "moderado", "etiqueta": "Moderado (humo, vapores, polvo)", "factor": 1.5 },
+  { "id": "alto", "etiqueta": "Alto (gases, químicos, soldadura)", "factor": 2 }
+]

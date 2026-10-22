@@ -200,3 +200,40 @@ td:first-child { font-weight: 700; }
   html { scroll-behavior: auto; }
   * { transition: none !important; }
 }
+
+/* ===== Alcance (4 botones), comparativa de caudal, elegir modelo ===== */
+.segmentado-4 { grid-template-columns: repeat(4, 1fr); }
+.segmentado-4 button { font-size: 0.84rem; padding: 9px 4px; }
+@media (max-width: 420px) {
+  .segmentado-4 { grid-template-columns: repeat(2, 1fr); }
+  .segmentado-4 button:nth-child(n + 3) { border-top: 1.5px solid #cbd5e1; }
+  .segmentado-4 button:nth-child(3) { border-left: 0; }
+}
+
+.comparativa { margin: 16px 0 6px; padding: 14px 16px; border-radius: 12px; background: var(--fondo); border: 1px solid var(--borde); }
+.comparativa h4 { margin: 0 0 10px; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #475569; }
+.barra-fila { display: grid; grid-template-columns: 78px 1fr auto; align-items: center; gap: 10px; margin-bottom: 8px; font-size: 0.88rem; }
+.barra-nombre { color: #475569; font-weight: 600; }
+.barra-pista { height: 12px; border-radius: 99px; background: #e2e8f0; overflow: hidden; }
+.barra { display: block; height: 100%; border-radius: 99px; }
+.barra-requerido { background: var(--carbon-2); }
+.barra-brindado { background: var(--naranja); }
+.comparativa-nota { margin: 8px 0 0; font-size: 0.82rem; color: #334155; }
+@media (max-width: 440px) { .barra-fila { grid-template-columns: 1fr auto; } .barra-pista { grid-column: 1 / -1; order: 3; } }
+
+.enlace-boton { margin: 4px 0 8px; padding: 6px 0; min-height: 36px; font: inherit; font-weight: 600; font-size: 0.88rem; color: #8a4b00; background: transparent; border: 0; cursor: pointer; text-decoration: underline; }
+.enlace-boton:hover { color: var(--texto); }
+.elegir { font: inherit; font-weight: 600; font-size: 0.85rem; min-height: 36px; padding: 6px 14px; cursor: pointer; border-radius: 8px; color: var(--texto); background: var(--naranja); border: 0; transition: background-color 0.2s; }
+.elegir:hover { background: var(--naranja-hover); }
+.elegir:focus-visible { outline-color: #fff; }
+.mini-etiqueta { margin-left: 8px; padding: 2px 8px; border-radius: 99px; font-size: 0.68rem; font-weight: 700; background: rgba(242, 148, 2, 0.2); color: #ffb84d; }
+.solo-lectores { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.tabla-scroll { position: relative; }
+th { position: relative; }
+
+/* Filas de "Otras opciones": clic o Enter para elegir */
+.fila-elegible { cursor: pointer; transition: background-color 0.15s; }
+.fila-elegible:hover { background: rgba(242, 148, 2, 0.16) !important; }
+.fila-elegible:active { background: rgba(242, 148, 2, 0.28) !important; }
+.fila-elegible:focus-visible { outline: 2px solid var(--naranja); outline-offset: -2px; }
+.fila-elegible td:first-child::after { content: "›"; margin-left: 8px; color: var(--naranja); font-weight: 800; }

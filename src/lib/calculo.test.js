@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { calcular, aNumero, nombreDe, renovacionesDe, eficienciaDe } from "./calculo.js";
+import { calcular, aNumero, nombreDe, renovacionesDe } from "./calculo.js";
 
 const catalogo = JSON.parse(readFileSync(new URL("../data/ventiladores.json", import.meta.url)));
 
@@ -111,11 +111,6 @@ test("CFM total por opción = m³/h × 0.5886", () => {
   assert.ok(Math.abs(o.caudalTotalCfm - o.caudalTotal * 0.5886) < 1e-6);
 });
 
-test("función inyección sin modelos marcados → sin opciones", () => {
-  const base = { largo: 20, ancho: 10, alto: 5, renovaciones: 10 };
-  assert.equal(calcular({ ...base, funcion: "inyeccion" }, catalogo).opciones.length, 0);
-});
-
 test("con entrada de aire: axial = solo inyector (sin pareja)", () => {
   const r = calcular({ largo: 30, ancho: 20, alto: 8, renovaciones: 10, eficiencia: 0.8, voltaje: "220V", entradaAire: true }, catalogo);
   const o = r.opciones[0];
@@ -153,14 +148,14 @@ test("aNumero acepta coma decimal", () => {
   assert.ok(Number.isNaN(aNumero("")));
 });
 
-test("caudal a cubrir: 100% equivale al 80% de rendimiento; 125% pide más aire", () => {
-  assert.ok(Math.abs(eficienciaDe(100) - 0.8) < 1e-12);
-  const base = { largo: 20, ancho: 10, alto: 5, renovaciones: 10 };
-  const a = calcular({ ...base, eficiencia: eficienciaDe(100) }, catalogo);
-  const b = calcular({ ...base, eficiencia: eficienciaDe(125) }, catalogo);
-  assert.ok(b.opciones[0].caudalTotal >= a.opciones[0].caudalTotal * 0 && b.opciones.find((o) => o.modelo === "DF600").unidades >= a.opciones.find((o) => o.modelo === "DF600").unidades);
+test("caudal a cubrir (margen): 125% pide más unidades que 100%, y el caudal brindado supera el requerido", () => {
+  const base = { largo: 20, ancho: 10, alto: 5, renovaciones: 10, eficiencia: 0.8 };
+  const a = calcular({ ...base, margen: 1 }, catalogo).opciones.find((o) => o.modelo === "DF750");
+  const b = calcular({ ...base, margen: 1.25 }, catalogo).opciones.find((o) => o.modelo === "DF750");
+  assert.ok(b.unidades >= a.unidades);
+  const r = calcular({ ...base, margen: 1.25 }, catalogo);
+  assert.ok(r.opciones.every((o) => o.caudalTotal >= r.caudalRequerido * 1.25 - 1e-6));
 });
-
 test("línea doméstica solo trae modelos domésticos; industrial no los incluye", () => {
   const base = { largo: 4, ancho: 3, alto: 2.6, renovaciones: 6, eficiencia: 0.8 };
   const d = calcular({ ...base, linea: "domestica" }, catalogo);
@@ -183,4 +178,38 @@ test("preferencia doméstica (oficina): gana un doméstico aunque haya un indust
 test("preferencia doméstica se ignora si necesitaría más de 6 unidades", () => {
   const r = calcular({ largo: 60, ancho: 30, alto: 5, renovaciones: 10, eficiencia: 0.8, linea: "todas", preferirLinea: "domestica" }, catalogo);
   assert.equal(r.opciones[0].linea, "industrial");
+});
+
+test("alcance 'ambas': solo modelos con extracción e inyección, siempre en pareja (2x unidades)", () => {
+  const r = calcular({ largo: 30, ancho: 20, alto: 8, renovaciones: 10, eficiencia: 0.8, funcion: "ambas", entradaAire: true }, catalogo);
+  assert.ok(r.opciones.length > 0);
+  assert.ok(r.opciones.every((o) => o.extraccion && o.inyeccion && o.enPareja && o.unidades === 2 * o.unidadesPorLado));
+});
+
+test("alcance 'inyeccion': hay modelos (ya no queda vacío)", () => {
+  const r = calcular({ largo: 20, ancho: 10, alto: 5, renovaciones: 10, eficiencia: 0.8, linea: "todas", funcion: "inyeccion" }, catalogo);
+  assert.ok(r.opciones.length > 0);
+  assert.ok(r.opciones.every((o) => o.inyeccion === true));
+});
+
+test("personas suman aire: caudal requerido = renovaciones + personas×m³/h + área×m³/h/m²", () => {
+  const base = { largo: 10, ancho: 10, alto: 3, renovaciones: 6, eficiencia: 0.8 };
+  const sin = calcular(base, catalogo);
+  const con = calcular({ ...base, personas: 20, m3hPorPersona: 8.5, m3hPorM2: 1.1 }, catalogo);
+  assert.equal(sin.caudalPersonas, 0);
+  assert.ok(Math.abs(con.caudalPersonas - (20 * 8.5 + 100 * 1.1)) < 1e-9);
+  assert.ok(Math.abs(con.caudalRequerido - (sin.caudalRequerido + con.caudalPersonas)) < 1e-9);
+});
+
+test("caudal brindado por lado en catálogo (CFM) = unidades por lado × CFM del modelo", () => {
+  const r = calcular({ largo: 20, ancho: 10, alto: 5, renovaciones: 10, eficiencia: 0.8, linea: "industrial" }, catalogo);
+  const o = r.opciones.find((x) => x.modelo === "DF600");
+  assert.ok(Math.abs(o.caudalCatalogoCfm - o.unidadesPorLado * 7600) < 1e-6);
+});
+
+test("AIP-500/AIP-600 son axiales: sin entrada de aire van en pareja", () => {
+  const r = calcular({ largo: 10, ancho: 10, alto: 4, renovaciones: 8, eficiencia: 0.8, linea: "industrial", entradaAire: false }, catalogo);
+  const aip = r.opciones.filter((o) => nombreDe(o).startsWith("AIP"));
+  assert.equal(aip.length, 2);
+  assert.ok(aip.every((o) => o.axial && o.enPareja && o.unidades === 2 * o.unidadesPorLado));
 });
