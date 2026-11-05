@@ -16,7 +16,7 @@
   {"modelo": "FS-40", "linea": "domestica", "voltaje": 120, "potenciaW": 44, "cfm": 1236, "ruidoMax": 65, "inyeccion": true, "nivelRuido": 4},
   {"modelo": "FS-45", "linea": "domestica", "voltaje": 120, "potenciaW": 60, "cfm": 1589, "ruidoMax": 63, "inyeccion": true, "nivelRuido": 4},
   {"modelo": "TF-40", "linea": "domestica", "voltaje": 120, "potenciaW": 60, "cfm": 883, "comentario": "Sin dato de ruido en el Excel.", "inyeccion": true, "nivelRuido": 2},
-  {"modelo": "UR-623", "linea": "domestica", "voltaje": 120, "potenciaW": 75, "cfm": 6886, "ruidoMax": 68, "comentario": "El Excel trae 68 dB mínima y 40 dB máxima (inconsistente). Se usó 68 dB.", "inyeccion": true, "nivelRuido": 4, "confort": true, "tipo": "Ventilador de techo", "uso": "confort en hostels y cabinas"},
+  {"modelo": "UR-623", "linea": "domestica", "voltaje": 120, "potenciaW": 75, "cfm": 6886, "ruidoMax": 68, "comentario": "El Excel trae 68 dB mínima y 40 dB máxima (inconsistente). Se usó 68 dB.", "inyeccion": true, "nivelRuido": 4, "techo": true},
   {"modelo": "VO-16", "linea": "domestica", "voltaje": 120, "potenciaW": 60, "cfm": 2118, "ruidoMax": 62, "comentario": "El Excel trae <62 dB mínima y <52 dB máxima (inconsistente). Se usó 62 dB.", "inyeccion": true, "nivelRuido": 7},
   {"modelo": "VP-16CR", "linea": "domestica", "voltaje": 120, "potenciaW": 55, "cfm": 1942, "ruidoMax": 62, "inyeccion": true, "nivelRuido": 5}
 ]

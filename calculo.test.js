@@ -270,12 +270,33 @@ test("explicarEleccion avisa 220 V y opción elegida manualmente", () => {
   assert.ok(!manual.some((l) => l.startsWith("Alternativa")));
 });
 
-test("UR-623 (ventilador de techo, confort) no cuenta para el caudal y se devuelve aparte", () => {
-  const r = calcular({ largo: 20, ancho: 12, alto: 6, renovaciones: 7, linea: "todas" }, catalogo);
-  assert.ok(r.opciones.every((o) => o.modelo !== "UR-623"));
-  assert.deepEqual(r.confort.map((c) => c.modelo), ["UR-623"]);
-  const ind = calcular({ largo: 20, ancho: 12, alto: 6, renovaciones: 7, linea: "industrial" }, catalogo);
-  assert.equal(ind.confort.length, 0);
+test("UR-623 (techo) cuenta para el caudal, pero en espacios de más de 30 m² nunca es la primera opción", () => {
+  const grande = calcular({ largo: 10, ancho: 8, alto: 3, renovaciones: 6, linea: "domestica" }, catalogo);
+  const ur = grande.opciones.find((o) => o.modelo === "UR-623");
+  assert.ok(ur && ur.relegado);
+  assert.notEqual(grande.opciones[0].modelo, "UR-623");
+  assert.equal(grande.opciones.at(-1).modelo, "UR-623");
+  const lineas = explicarEleccion({ resultado: grande, opcion: ur, renovaciones: 6 });
+  assert.match(lineas.join(" "), /ventilador de techo: en espacios de más de 30 m²/);
+});
+
+test("UR-623 en una cabina pequeña (≤ 30 m²) compite normal", () => {
+  const r = calcular({ largo: 5, ancho: 5, alto: 3, renovaciones: 50, linea: "domestica" }, catalogo);
+  const ur = r.opciones.find((o) => o.modelo === "UR-623");
+  assert.equal(ur.relegado, false);
+  assert.equal(r.opciones[0].modelo, "UR-623");
+});
+
+test("domésticos sin entrada de aire: se les pide 25 % más de caudal; a los industriales no", () => {
+  const con = calcular({ largo: 10, ancho: 8, alto: 3, renovaciones: 6, linea: "todas", entradaAire: true }, catalogo);
+  const sin = calcular({ largo: 10, ancho: 8, alto: 3, renovaciones: 6, linea: "todas", entradaAire: false }, catalogo);
+  const dom = sin.opciones.find((o) => o.modelo === "VP-16CR");
+  assert.equal(dom.factorSinEntrada, 1.25);
+  assert.ok(Math.abs(dom.requeridoCfm - sin.caudalRequeridoCfm * 1.25) < 1e-6);
+  assert.ok(dom.unidades >= con.opciones.find((o) => o.modelo === "VP-16CR").unidades);
+  assert.equal(sin.opciones.find((o) => o.modelo === "XDF-45").factorSinEntrada, 1);
+  const lineas = explicarEleccion({ resultado: sin, opcion: dom, renovaciones: 6 });
+  assert.match(lineas.join(" "), /no tiene entrada de aire.*25 % más/);
 });
 
 // ── Tolerancia de exceso (30 %) ─────────────────────────────────────────────

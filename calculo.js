@@ -17,6 +17,12 @@ export const MAX_UNIDADES_EXTRA = 1;
 // ...y consumir como máximo este porcentaje más de vatios que la opción con menos unidades.
 export const MAX_AUMENTO_POTENCIA = 0.5;
 
+// Domésticos sin entrada de aire: les cuesta más mover el aire, así que se les pide este factor más de caudal (1,25 = 25 % más).
+export const FACTOR_DOMESTICO_SIN_ENTRADA = 1.25;
+// Ventiladores de techo (campo "techo": true, ej. UR-623): en espacios de más de estos m² de piso no pueden ser
+// la primera opción por el tipo de instalación (en aulas se prefieren los de pared, como VP-16C o VP-16CR).
+export const AREA_MAX_TECHO_M2 = 30;
+
 /** Nivel de ruido (1–15) equivalente a un valor en dB: cada nivel agrupa 5 dB (nivel 1 = hasta 35 dB; 15 = más de 100). */
 export const nivelDeDb = (db) => Math.min(15, Math.max(1, Math.ceil((db - 30) / 5)));
 
@@ -105,12 +111,9 @@ export function calcular(entrada, catalogo) {
   const cumpleLineaYVoltaje = (f) =>
     (linea === "todas" || (f.linea ?? "industrial") === linea) && (voltaje === "Cualquiera" || `${voltajeNominal(f)}V` === voltaje);
 
-  // Ventiladores de confort (ej. UR-623, de techo): mueven el aire dentro del local pero no lo renuevan,
-  // así que no cuentan para el caudal. Se devuelven aparte como complemento.
-  const confort = catalogo.filter((f) => f.confort === true && cumpleLineaYVoltaje(f));
+  const area = largo * ancho;
 
   const opciones = catalogo
-    .filter((f) => f.confort !== true)
     .filter((f) => caudalCatalogoM3h(f) > 0)
     .filter(cumpleLineaYVoltaje)
     // Función requerida: solo modelos marcados para extraer / inyectar aire. "ambas" = el modelo debe poder hacer las dos.
@@ -119,8 +122,11 @@ export function calcular(entrada, catalogo) {
     .filter((f) => nivelRuidoMax === Infinity || (nivelRuidoDe(f) != null && nivelRuidoDe(f) <= nivelRuidoMax))
     .map((f) => {
       const caudalUnidad = caudalCatalogoM3h(f) * eficiencia; // m³/h reales por unidad
+      // Domésticos sin entrada de aire: se les pide más caudal porque les cuesta más mover el aire.
+      const factorSinEntrada = entradaAire === false && (f.linea ?? "industrial") === "domestica" ? FACTOR_DOMESTICO_SIN_ENTRADA : 1;
+      const requeridoModelo = caudalRequerido * factorSinEntrada; // m³/h que se le pide a este modelo
       // Unidades necesarias para mover el caudal requerido por un lado (inyección o extracción).
-      const unidadesPorLado = Math.max(1, Math.ceil((caudalRequerido * margen) / caudalUnidad - 1e-9));
+      const unidadesPorLado = Math.max(1, Math.ceil((requeridoModelo * margen) / caudalUnidad - 1e-9));
       // Sin entrada de aire, los axiales van en pareja: mismas unidades para inyectar y para extraer.
       const enPareja = funcion === "ambas" || (f.axial === true && entradaAire === false);
       const unidades = enPareja ? unidadesPorLado * 2 : unidadesPorLado;
@@ -134,16 +140,26 @@ export function calcular(entrada, catalogo) {
         caudalTotal,
         caudalTotalCfm: caudalTotal * CFM_POR_M3H,
         caudalCatalogoCfm: unidadesPorLado * caudalCatalogoM3h(f) * CFM_POR_M3H, // 100 % de catálogo, por lado
-        exceso: caudalTotal / caudalRequerido - 1,
+        factorSinEntrada,
+        requeridoCfm: requeridoModelo * CFM_POR_M3H,
+        exceso: caudalTotal / requeridoModelo - 1,
         // Exceso contra el caudal pedido con la barra "Caudal a cubrir" (es el que usa la tolerancia).
-        excesoPedido: caudalTotal / (caudalRequerido * margen) - 1,
+        excesoPedido: caudalTotal / (requeridoModelo * margen) - 1,
+        // De techo en un espacio grande: queda al final de la lista (no puede ser la recomendada si hay otra opción).
+        relegado: f.techo === true && area > AREA_MAX_TECHO_M2,
         preferida: preferirLinea != null && (f.linea ?? "industrial") === preferirLinea && unidades <= MAX_UNIDADES_PREFERIDA,
         nivelRuido: nivelRuidoDe(f),
         potenciaTotalW: unidades * f.potenciaW,
         renovacionesReales: caudalTotal / volumen,
       };
     })
-    .sort((a, b) => Number(b.preferida) - Number(a.preferida) || a.unidades - b.unidades || a.exceso - b.exceso);
+    .sort(
+      (a, b) =>
+        Number(a.relegado) - Number(b.relegado) ||
+        Number(b.preferida) - Number(a.preferida) ||
+        a.unidades - b.unidades ||
+        a.exceso - b.exceso
+    );
 
   const { ajuste, sinAjuste } = elegirAjustada(opciones, preferirLinea);
 
@@ -155,7 +171,6 @@ export function calcular(entrada, catalogo) {
     caudalRequeridoCfm: caudalRequerido * CFM_POR_M3H,
     caudalRequeridoLps: caudalRequerido * LPS_POR_M3H,
     opciones,
-    confort,
     ajuste,
     sinAjuste,
   };
@@ -180,6 +195,7 @@ function elegirAjustada(opciones, preferirLinea) {
     .filter(
       (o) =>
         o !== primera &&
+        !o.relegado &&
         o.excesoPedido >= 0 &&
         o.excesoPedido <= TOLERANCIA_EXCESO &&
         o.unidadesPorLado <= primera.unidadesPorLado + MAX_UNIDADES_EXTRA &&
@@ -264,6 +280,20 @@ export function explicarEleccion({ resultado, opcion, renovaciones, nivelRuidoMa
   }
   if (esRecomendado && resultado.sinAjuste) {
     lineas.push("Da bastante aire de más, pero el catálogo no tiene una opción más ajustada con las condiciones elegidas.");
+  }
+
+  if (opcion.factorSinEntrada > 1) {
+    lineas.push(
+      `Como el local no tiene entrada de aire, a los ventiladores domésticos se les pide ${fmt0((opcion.factorSinEntrada - 1) * 100)} % más de caudal ` +
+        `(${fmt0(opcion.requeridoCfm)} CFM), porque les cuesta más mover el aire.`
+    );
+  }
+  if (opcion.techo) {
+    lineas.push(
+      opcion.relegado
+        ? `Es un ventilador de techo: en espacios de más de ${AREA_MAX_TECHO_M2} m² se prefieren otros por la instalación, pero también se puede usar si el cielo raso lo permite.`
+        : "Es un ventilador de techo: requiere instalación en el cielo raso. Ideal para espacios pequeños como habitaciones, cabinas u hostels."
+    );
   }
 
   // 4. Ruido.

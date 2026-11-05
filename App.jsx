@@ -113,7 +113,6 @@ export default function App() {
               funcion={form.funcion}
               entradaAire={form.entradaAire === "si"}
               voltajeElegido={form.voltaje}
-              mostrarConfort={local?.preferencia === "domestica"}
             />
           </div>
           <p className="formula">
