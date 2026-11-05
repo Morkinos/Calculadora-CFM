@@ -3,6 +3,7 @@ import ventiladores from "./data/ventiladores.json";
 import locales from "./data/locales.json";
 import nivelesRuido from "./data/ruido.json";
 import contaminantes from "./data/contaminantes.json";
+import escalaRuido from "./data/escalaRuido.json";
 import { calcular, aNumero, renovacionesDe, RENDIMIENTO_VENTILADOR } from "./lib/calculo.js";
 import Navbar from "./components/Navbar.jsx";
 import Hero from "./components/Hero.jsx";
@@ -17,7 +18,7 @@ const INICIAL = {
   alto: "", // altura máxima
   altoMin: "", // altura mínima (opcional)
   local: locales[0].nombre,
-  calor: "alto", // "bajo" | "medio" | "alto": mínimo, media o máximo del rango de renovaciones (por defecto el máximo)
+  calor: "medio", // calor de la zona: "bajo" | "medio" | "alto" = mínimo, media o máximo del rango de renovaciones (por defecto la media)
   contaminante: "ninguno", // ver data/contaminantes.json: multiplica las renovaciones por hora
   personas: "", // cantidad aproximada de personas (opcional)
   entradaAire: "si", // "si" | "no"
@@ -25,7 +26,8 @@ const INICIAL = {
   voltaje: "Cualquiera",
   linea: "todas", // "industrial" | "domestica" | "todas"
   cobertura: 100, // % del caudal requerido a cubrir (65 a 125); 100 = caudal calculado con 80 % de rendimiento
-  ruido: "libre",
+  // Personas en el local (define el límite de ruido). Por defecto, según el tipo de local (campo "personas" de locales.json).
+  ruido: locales[0].personas ?? "libre",
   ruidoPersonalizado: "",
   funcion: "cualquiera",
 };
@@ -48,12 +50,12 @@ export default function App() {
   const personas = form.ruido !== "libre" ? aNumero(form.personas) : NaN;
 
   // Límite de ruido por unidad en dB (Infinity = sin límite).
-  const ruidoMaxDb = useMemo(() => {
+  const nivelRuidoMax = useMemo(() => {
     if (form.ruido === "personalizado") {
       const v = aNumero(form.ruidoPersonalizado);
-      return Number.isFinite(v) && v > 0 ? v : Infinity;
+      return Number.isFinite(v) && v >= 1 ? Math.min(15, Math.round(v)) : Infinity;
     }
-    return nivelesRuido.find((r) => r.id === form.ruido)?.maxDb ?? Infinity;
+    return nivelesRuido.find((r) => r.id === form.ruido)?.maxNivel ?? Infinity;
   }, [form.ruido, form.ruidoPersonalizado]);
 
   const preferirLinea = local?.preferencia ?? null;
@@ -75,13 +77,13 @@ export default function App() {
           personas,
           m3hPorPersona: local?.rpp ?? 0,
           m3hPorM2: local?.rm2 ?? 0,
-          ruidoMaxDb,
+          nivelRuidoMax,
           funcion: form.funcion,
           entradaAire: form.entradaAire === "si",
         },
         ventiladores
       ),
-    [form, renovaciones, ruidoMaxDb, preferirLinea, personas, local]
+    [form, renovaciones, nivelRuidoMax, preferirLinea, personas, local]
   );
 
   return (
@@ -98,6 +100,7 @@ export default function App() {
               locales={locales}
               nivelesRuido={nivelesRuido}
               contaminantes={contaminantes}
+              escalaRuido={escalaRuido}
               factorContaminante={factorContaminante}
               renovaciones={renovaciones}
               onLimpiar={() => setForm(INICIAL)}
@@ -105,16 +108,19 @@ export default function App() {
             <Resultados
               resultado={resultado}
               renovaciones={renovaciones}
-              ruidoMaxDb={ruidoMaxDb}
+              nivelRuidoMax={nivelRuidoMax}
+              escalaRuido={escalaRuido}
               funcion={form.funcion}
               entradaAire={form.entradaAire === "si"}
+              voltajeElegido={form.voltaje}
             />
           </div>
           <p className="formula">
             Volumen (m³) = largo × ancho × alto · Caudal requerido Q (m³/h) = volumen × renovaciones por hora (R/H) · CFM = m³/h × 0.5886 ·
             Unidades = (caudal requerido × caudal a cubrir) ÷ (CFM de catálogo × 80 % de rendimiento), redondeado hacia arriba. Con personas se suma el
             aire de ventilación por ocupante (ASHRAE 62.1) y con contaminantes se multiplican las renovaciones. Las renovaciones por tipo
-            de local son valores de referencia (DIN 1946); por defecto se usa el máximo del rango.
+            de local son valores de referencia (DIN 1946); el calor de la zona elige el mínimo, la media (por defecto) o el máximo del rango. Se recomienda la opción con menos unidades; si da más de 30 % de aire de más, se
+            elige una más ajustada (máximo 1 unidad más por lado y hasta 50 % más de consumo).
           </p>
         </section>
 

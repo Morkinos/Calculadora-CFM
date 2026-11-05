@@ -88,7 +88,7 @@ a { color: inherit; }
 /* ===== Calculadora ===== */
 .calculadora { margin-top: -72px; position: relative; z-index: 1; }
 .rejilla { display: grid; gap: 20px; grid-template-columns: 1fr; align-items: start; }
-@media (min-width: 900px) { .rejilla { grid-template-columns: 400px 1fr; } }
+/* Formulario arriba a todo el ancho y resultado debajo (el formulario se reparte en columnas en pantallas anchas). */
 .rejilla > * { min-width: 0; }
 .formula { margin: 18px 4px 0; font-size: 0.8rem; color: var(--suave); max-width: 90ch; }
 
@@ -237,3 +237,43 @@ th { position: relative; }
 .fila-elegible:active { background: rgba(242, 148, 2, 0.28) !important; }
 .fila-elegible:focus-visible { outline: 2px solid var(--naranja); outline-offset: -2px; }
 .fila-elegible td:first-child::after { content: "›"; margin-left: 8px; color: var(--naranja); font-weight: 800; }
+
+/* Escala de ruido */
+.escala { margin: -4px 0 18px; border: 1px solid var(--borde); border-radius: 10px; background: var(--fondo); }
+.escala summary { cursor: pointer; padding: 10px 12px; font-weight: 600; font-size: 0.86rem; min-height: 44px; display: flex; align-items: center; }
+.escala ol { list-style: none; margin: 0; padding: 0 12px 10px; display: grid; gap: 6px; }
+.escala li { display: grid; grid-template-columns: 1fr auto; gap: 0 10px; font-size: 0.84rem; padding-top: 6px; border-top: 1px solid var(--borde); }
+.escala li span { color: var(--suave); font-variant-numeric: tabular-nums; }
+.escala li small { grid-column: 1 / -1; color: var(--suave); font-size: 0.76rem; }
+
+/* ¿Por qué este modelo? (explicación para el vendedor) */
+.porque { margin: 14px 0 0; padding: 14px 16px; border-radius: 12px; background: var(--fondo); border: 1px solid var(--borde); }
+.porque h4 { margin: 0 0 8px; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: #475569; }
+.porque ul { margin: 0; padding-left: 18px; display: grid; gap: 6px; }
+.porque li { font-size: 0.88rem; color: #334155; overflow-wrap: anywhere; }
+.porque .boton-copiar { margin-top: 12px; width: 100%; }
+
+/* Ajustes avanzados (bloque plegable del formulario) */
+.avanzado { margin: 4px 0 18px; }
+.avanzado-contenido { padding: 6px 12px 2px; }
+.avanzado-contenido .escala { margin: 0 0 12px; background: var(--blanco); }
+
+/* Formulario en cuadrícula: 1 columna en celular, 2 en tableta, 3 en computadora */
+.tarjeta-cabecera { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 18px; }
+.tarjeta-cabecera h2 { margin: 0; }
+.form-grid { display: grid; grid-template-columns: 1fr; column-gap: 24px; align-items: start; }
+.form-grid > * { min-width: 0; }
+.form-grid > .ancho-completo { grid-column: 1 / -1; }
+@media (min-width: 720px) { .form-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 1024px) { .form-grid { grid-template-columns: repeat(3, 1fr); } }
+
+/* Resultado en computadora: el modelo recomendado a la izquierda y "¿Por qué este modelo?" a la derecha */
+.recomendado-cols > * { min-width: 0; }
+@media (min-width: 1024px) {
+  .recomendado-cols { display: grid; grid-template-columns: 1.25fr 1fr; gap: 24px; align-items: start; }
+  .recomendado-cols .porque { margin-top: 0; }
+}
+
+/* Botón Limpiar en gris carbón azulado (mismo color de la tarjeta Resultado) */
+button.secundario.boton-limpiar { background: var(--carbon); color: var(--blanco); border-color: var(--carbon); }
+button.secundario.boton-limpiar:hover { background: var(--carbon-2); border-color: var(--carbon-2); }
