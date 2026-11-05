@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { calcular, aNumero, nombreDe, renovacionesDe } from "./calculo.js";
+import { nivelDeDb, nivelRuidoDe, calcular, aNumero, nombreDe, renovacionesDe, explicarEleccion } from "./calculo.js";
 
 const catalogo = JSON.parse(readFileSync(new URL("../data/ventiladores.json", import.meta.url)));
 
@@ -35,20 +35,21 @@ test("cocina 4800 m³, 20 ren/h, 110V, 100% → DF750 x5", () => {
   assert.equal(mejor(r), "DF750 x5");
 });
 
-test("límite de ruido 60 dB: solo modelos ≤ 60 dB; nave → AXIAL 9,5 x16", () => {
-  const r = calcular({ largo: 100, ancho: 50, alto: 10, renovaciones: 8, eficiencia: 0.8, ruidoMaxDb: 60 }, catalogo);
-  assert.ok(r.opciones.length > 0 && r.opciones.every((o) => o.ruidoMax <= 60));
-  assert.equal(mejor(r), "AXIAL 9,5 x16");
+test("límite de ruido nivel 7: solo modelos de nivel ≤ 7 (los domésticos); ningún axial", () => {
+  const r = calcular({ largo: 20, ancho: 10, alto: 5, renovaciones: 8, eficiencia: 0.8, linea: "todas", nivelRuidoMax: 7 }, catalogo);
+  assert.ok(r.opciones.length > 0 && r.opciones.every((o) => o.nivelRuido <= 7));
+  assert.ok(!r.opciones.some((o) => o.axial));
 });
 
-test("límite de ruido 70 dB excluye DF750 (75 dB) y 50-FQ (71 dB)", () => {
-  const r = calcular({ largo: 20, ancho: 10, alto: 5, renovaciones: 10, eficiencia: 0.8, ruidoMaxDb: 70 }, catalogo);
+test("límite de ruido nivel 10 excluye DF750, DF600 y los axiales, pero deja 50-FQ y 50T-W", () => {
+  const r = calcular({ largo: 20, ancho: 10, alto: 5, renovaciones: 10, eficiencia: 0.8, linea: "industrial", nivelRuidoMax: 10 }, catalogo);
   const nombres = r.opciones.map((o) => o.modelo);
-  assert.ok(!nombres.includes("DF750") && !nombres.includes("50-FQ") && nombres.includes("DF600"));
+  assert.ok(!nombres.includes("DF750") && !nombres.includes("DF600") && !nombres.includes("AXIAL 9,5"));
+  assert.ok(nombres.includes("50-FQ") && nombres.includes("50T-W"));
 });
 
 test("límite de ruido imposible → sin opciones", () => {
-  const r = calcular({ largo: 10, ancho: 10, alto: 3, renovaciones: 6, ruidoMaxDb: 30 }, catalogo);
+  const r = calcular({ largo: 10, ancho: 10, alto: 3, renovaciones: 6, nivelRuidoMax: 1 }, catalogo);
   assert.equal(r.opciones.length, 0);
 });
 
@@ -58,9 +59,9 @@ test("función extracción: solo modelos con extraccion=true", () => {
   assert.ok(!r.opciones.some((o) => o.modelo === "DF600"));
 });
 
-test("extracción + 110V + moderado → solo los AIP", () => {
+test("extracción + 110V + nivel ≤ 13 → solo los AIP", () => {
   const r = calcular(
-    { largo: 20, ancho: 10, alto: 5, renovaciones: 10, eficiencia: 0.8, funcion: "extraccion", voltaje: "120V", ruidoMaxDb: 80 },
+    { largo: 20, ancho: 10, alto: 5, renovaciones: 10, eficiencia: 0.8, funcion: "extraccion", voltaje: "120V", nivelRuidoMax: 13 },
     catalogo
   );
   assert.deepEqual(r.opciones.map((o) => nombreDe(o)).sort(), ["AIP-500", "AIP-600"]);
@@ -212,4 +213,124 @@ test("AIP-500/AIP-600 son axiales: sin entrada de aire van en pareja", () => {
   const aip = r.opciones.filter((o) => nombreDe(o).startsWith("AIP"));
   assert.equal(aip.length, 2);
   assert.ok(aip.every((o) => o.axial && o.enPareja && o.unidades === 2 * o.unidadesPorLado));
+});
+
+test("escala de ruido: dB → nivel 1–15 (cada nivel = 5 dB)", () => {
+  assert.equal(nivelDeDb(30), 1);
+  assert.equal(nivelDeDb(35), 1);
+  assert.equal(nivelDeDb(36), 2);
+  assert.equal(nivelDeDb(60), 6);
+  assert.equal(nivelDeDb(70), 8);
+  assert.equal(nivelDeDb(130), 15);
+});
+
+test("nivelRuido del catálogo manda sobre los dB: un axial queda fuera con personas trabajando (≤ nivel 10), el 50T-W no", () => {
+  const axial = catalogo.find((f) => f.modelo === "AXIAL 9,5");
+  const t50 = catalogo.find((f) => f.modelo === "50T-W");
+  assert.ok(nivelRuidoDe(axial) > nivelRuidoDe(t50) + 2);
+  const r = calcular({ largo: 20, ancho: 10, alto: 5, renovaciones: 10, eficiencia: 0.8, linea: "industrial", nivelRuidoMax: 10 }, catalogo);
+  assert.ok(!r.opciones.some((o) => o.modelo === "AXIAL 9,5"));
+  assert.ok(r.opciones.some((o) => o.modelo === "50T-W"));
+});
+
+// ── Personas según tipo de local y explicación para ventas ──────────────────
+const localesData = JSON.parse(readFileSync(new URL("../data/locales.json", import.meta.url)));
+
+test("cada tipo de local trae una opción de personas válida por defecto", () => {
+  const validas = ["libre", "moderado", "bajo", "personalizado"];
+  for (const l of localesData) assert.ok(validas.includes(l.personas), `${l.nombre}: ${l.personas}`);
+  assert.equal(localesData.find((l) => l.nombre === "Almacén / bodega").personas, "moderado");
+  assert.equal(localesData.find((l) => l.nombre === "Oficina").personas, "bajo");
+});
+
+test("bodega con personas trabajando (nivel 10) ya no recomienda axiales", () => {
+  const r = calcular({ largo: 30, ancho: 20, alto: 7, renovaciones: 10, linea: "todas", nivelRuidoMax: 10 }, catalogo);
+  assert.ok(r.opciones.every((o) => !o.axial));
+  assert.ok(r.opciones[0].nivelRuido <= 10);
+});
+
+test("explicarEleccion describe caudal, cantidad, motivo, ruido, consumo y alternativa", () => {
+  const r = calcular({ largo: 20, ancho: 12, alto: 6, renovaciones: 10, linea: "todas", nivelRuidoMax: 10 }, catalogo);
+  const lineas = explicarEleccion({ resultado: r, opcion: r.opciones[0], renovaciones: 10, nivelRuidoMax: 10, nombreNivel: () => "Alto" });
+  assert.equal(lineas.length, 6);
+  assert.match(lineas[0].replace(/\D(?=\d{3}\b)/g, ""), /1440 m³/);
+  assert.match(lineas[1], /^2 50T-S mueven/);
+  assert.match(lineas[2], /menos equipos/);
+  assert.match(lineas[3], /dentro del límite de nivel 10/);
+  assert.match(lineas[5], /^Alternativa:/);
+});
+
+test("explicarEleccion avisa 220 V y opción elegida manualmente", () => {
+  const r = calcular({ largo: 30, ancho: 20, alto: 7, renovaciones: 10, linea: "todas" }, catalogo);
+  const axial = r.opciones.find((o) => o.modelo === "AXIAL 9,5");
+  const otra = r.opciones.find((o) => o.modelo !== r.opciones[0].modelo && !o.axial);
+  assert.match(explicarEleccion({ resultado: r, opcion: axial, renovaciones: 10 }).join(" "), /220 V/);
+  const manual = explicarEleccion({ resultado: r, opcion: otra, renovaciones: 10 });
+  assert.match(manual.join(" "), /elegida manualmente/);
+  assert.ok(!manual.some((l) => l.startsWith("Alternativa")));
+});
+
+test("UR-623 (techo) cuenta para el caudal, pero en espacios de más de 30 m² nunca es la primera opción", () => {
+  const grande = calcular({ largo: 10, ancho: 8, alto: 3, renovaciones: 6, linea: "domestica" }, catalogo);
+  const ur = grande.opciones.find((o) => o.modelo === "UR-623");
+  assert.ok(ur && ur.relegado);
+  assert.notEqual(grande.opciones[0].modelo, "UR-623");
+  assert.equal(grande.opciones.at(-1).modelo, "UR-623");
+  const lineas = explicarEleccion({ resultado: grande, opcion: ur, renovaciones: 6 });
+  assert.match(lineas.join(" "), /ventilador de techo: en espacios de más de 30 m²/);
+});
+
+test("UR-623 en una cabina pequeña (≤ 30 m²) compite normal", () => {
+  const r = calcular({ largo: 5, ancho: 5, alto: 3, renovaciones: 50, linea: "domestica" }, catalogo);
+  const ur = r.opciones.find((o) => o.modelo === "UR-623");
+  assert.equal(ur.relegado, false);
+  assert.equal(r.opciones[0].modelo, "UR-623");
+});
+
+test("domésticos sin entrada de aire: se les pide 25 % más de caudal; a los industriales no", () => {
+  const con = calcular({ largo: 10, ancho: 8, alto: 3, renovaciones: 6, linea: "todas", entradaAire: true }, catalogo);
+  const sin = calcular({ largo: 10, ancho: 8, alto: 3, renovaciones: 6, linea: "todas", entradaAire: false }, catalogo);
+  const dom = sin.opciones.find((o) => o.modelo === "VP-16CR");
+  assert.equal(dom.factorSinEntrada, 1.25);
+  assert.ok(Math.abs(dom.requeridoCfm - sin.caudalRequeridoCfm * 1.25) < 1e-6);
+  assert.ok(dom.unidades >= con.opciones.find((o) => o.modelo === "VP-16CR").unidades);
+  assert.equal(sin.opciones.find((o) => o.modelo === "XDF-45").factorSinEntrada, 1);
+  const lineas = explicarEleccion({ resultado: sin, opcion: dom, renovaciones: 6 });
+  assert.match(lineas.join(" "), /no tiene entrada de aire.*25 % más/);
+});
+
+// ── Tolerancia de exceso (30 %) ─────────────────────────────────────────────
+test("tolerancia: taller de soldadura 18x10x4 cambia 1 AXIAL 9,5 (+41 %) por 2 × 50T-S", () => {
+  const r = calcular({ largo: 18, ancho: 10, alto: 4, renovaciones: 25, linea: "todas" }, catalogo);
+  assert.equal(mejor(r), "50T-S x2");
+  assert.equal(r.ajuste.reemplaza.modelo, "AXIAL 9,5");
+  const lineas = explicarEleccion({ resultado: r, opcion: r.opciones[0], renovaciones: 25 });
+  assert.match(lineas.join(" "), /Se prefirió sobre AXIAL 9,5 × 1/);
+});
+
+test("tolerancia: bodega 15x10x5 con personas trabajando → 2 × XDF-45 en vez de 1 × 50T-S (+73 %)", () => {
+  const r = calcular({ largo: 15, ancho: 10, alto: 5, renovaciones: 7, linea: "todas", nivelRuidoMax: 10, preferirLinea: null }, catalogo);
+  assert.equal(mejor(r), "XDF-45 x2");
+  assert.equal(r.ajuste.reemplaza.modelo, "50T-S");
+});
+
+test("tolerancia: no acepta opciones que consumen más de 50 % de vatios (fábrica 15x10x5 se queda con DF750)", () => {
+  const r = calcular({ largo: 15, ancho: 10, alto: 5, renovaciones: 15, linea: "todas" }, catalogo);
+  assert.equal(mejor(r), "DF750 x1");
+  assert.equal(r.ajuste, null);
+  assert.equal(r.sinAjuste, true);
+  const lineas = explicarEleccion({ resultado: r, opcion: r.opciones[0], renovaciones: 15 });
+  assert.match(lineas.join(" "), /no tiene una opción más ajustada/);
+});
+
+test("tolerancia: en locales sin preferencia doméstica no salta de industrial a doméstica", () => {
+  const r = calcular({ largo: 10, ancho: 8, alto: 4, renovaciones: 15, linea: "todas", nivelRuidoMax: 10 }, catalogo);
+  assert.notEqual(r.opciones[0].linea, "domestica");
+});
+
+test("tolerancia: el exceso se mide contra el caudal pedido con la barra (125 %)", () => {
+  const r = calcular({ largo: 20, ancho: 12, alto: 6, renovaciones: 10, linea: "todas", margen: 1.25 }, catalogo);
+  const o = r.opciones[0];
+  assert.ok(Math.abs(o.excesoPedido - (o.caudalTotal / (r.caudalRequerido * 1.25) - 1)) < 1e-9);
+  if (r.ajuste) assert.ok(o.excesoPedido <= 0.3);
 });
