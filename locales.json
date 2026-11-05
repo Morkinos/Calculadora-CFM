@@ -1,0 +1,11 @@
+[
+  {"nombre": "Oficina", "nivel": "DIN 1946: oficinas", "min": 4, "max": 8, "preferencia": "domestica", "rpp": 8.5, "rm2": 1.1, "personas": "bajo"},
+  {"nombre": "Aula", "nivel": "DIN 1946: aulas", "min": 5, "max": 7, "preferencia": "domestica", "rpp": 17, "rm2": 2.2, "personas": "bajo"},
+  {"nombre": "Restaurante", "nivel": "DIN 1946: restaurantes", "min": 8, "max": 12, "preferencia": "domestica", "rpp": 12.7, "rm2": 3.3, "personas": "bajo"},
+  {"nombre": "Gimnasio", "nivel": "DIN 1946: gimnasios", "min": 4, "max": 6, "preferencia": "domestica", "rpp": 34, "rm2": 3.3, "personas": "bajo"},
+  {"nombre": "Fábrica", "nivel": "DIN 1946: talleres de alteración pronunciada del aire", "min": 10, "max": 20, "rpp": 17, "rm2": 1.1, "personas": "moderado"},
+  {"nombre": "Taller", "nivel": "DIN 1946: talleres de alteración pronunciada del aire", "min": 10, "max": 20, "rpp": 17, "rm2": 1.1, "personas": "moderado"},
+  {"nombre": "Taller de soldadura", "nivel": "DIN 1946: talleres de soldadura", "min": 20, "max": 30, "rpp": 17, "rm2": 1.1, "personas": "moderado"},
+  {"nombre": "Cocina industrial", "nivel": "DIN 1946: cocinas industriales", "min": 15, "max": 30, "rpp": 17, "rm2": 3.3, "personas": "moderado"},
+  {"nombre": "Almacén / bodega", "nivel": "DIN 1946: locales acumuladores", "min": 5, "max": 10, "media": 7, "rpp": 17, "rm2": 1.1, "personas": "moderado"}
+]

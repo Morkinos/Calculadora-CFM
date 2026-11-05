@@ -20,7 +20,7 @@ Suba el contenido de `dist/` a cualquier hosting estático: Netlify (arrastrar l
 ## Cómo editar los datos
 
 - **Catálogo de ventiladores:** `src/data/ventiladores.json`. Para agregar un modelo copie una línea y cambie los valores. `cfm` es el caudal de la ficha (fuente del cálculo; si solo tiene m³/min multiplique por 35.31). `linea` es `industrial` o `domestica`. `nota` es opcional y se muestra como advertencia.
-- **Renovaciones por tipo de local:** `src/data/locales.json`. Cada local tiene `min` y `max` (tabla de VEGGA: bajo 4–6, medio 8–12, alto 15–30; almacén 5–10 según DIN 1946). La "media" es el promedio del rango, o el valor `media` si se define (almacén = 7). En la página el **nivel de calor** elige el valor del rango (Bajo = mínimo, Medio = media, Alto = máximo), o se escribe un valor manual.
+- **Renovaciones por tipo de local:** `src/data/locales.json`. Cada local tiene `min` y `max` (tabla de VEGGA: bajo 4–6, medio 8–12, alto 15–30; almacén 5–10 según DIN 1946). La "media" es el promedio del rango, o el valor `media` si se define (almacén = 7). En la página el **calor de la zona** elige el valor del rango (Bajo = mínimo, Medio = media, Alto = máximo), o se escribe un valor manual.
 - **Colores y estilo:** `src/styles.css`. La paleta VEGGA está en las variables del inicio del archivo (`--naranja`, `--carbon`, etc.); cambiándolas se actualiza toda la página. El logo es por ahora el texto "VEGGA" (`src/components/Navbar.jsx` y `Footer.jsx`); se puede reemplazar por una imagen.
 - **Nombre que se muestra:** por defecto es `modelo`. Si el nombre comercial es distinto, agregue `nombreMostrado` (ej. AIP-600).
 - **Modelos que extraen o inyectan aire:** agregue `"extraccion": true` y/o `"inyeccion": true` al modelo en `ventiladores.json`. Provisional; confirmar con el cliente.
@@ -51,5 +51,16 @@ Después de cambiar datos o lógica, ejecute `npm test` para comprobar que los r
 - **Elegir modelo:** en "Otras opciones", el botón Elegir lo muestra como resultado principal.
 - **Contaminantes:** `src/data/contaminantes.json` (factor que multiplica las renovaciones: leve ×1,25, moderado ×1,5, alto ×2; criterio estimado, por confirmar).
 - **Personas:** `rpp` (m³/h por persona) y `rm2` (m³/h por m²) en `locales.json` (IMC/ASHRAE 62.1); el aire por personas se SUMA al de renovaciones.
-- **Renovaciones:** valores DIN 1946 (Casals/Soler&Palau); por defecto se usa el máximo del rango (Nivel de calor = Alto).
+- **Personas por defecto según el local:** campo `personas` en `locales.json` (`"moderado"` = trabajando, hasta nivel 10; `"bajo"` = atención al público u oficina, hasta nivel 7; `"libre"` = sin personas). Al elegir el tipo de local, la pregunta "¿Hay personas en el local?" toma ese valor y el usuario puede cambiarlo.
+- **¿Por qué este modelo?:** `explicarEleccion()` en `src/lib/calculo.js` arma las frases que ve el vendedor bajo el resultado (con botón "Copiar explicación").
+- **Tolerancia de exceso:** constantes `TOLERANCIA_EXCESO` (0,3), `MAX_UNIDADES_EXTRA` (1, por lado) y `MAX_AUMENTO_POTENCIA` (0,5) al inicio de `src/lib/calculo.js`. Si la opción con menos unidades da más de 30 % de aire de más (medido contra el caudal pedido con la barra), pasa al frente la más ajustada que cumpla los límites, respete la preferencia doméstica y, en locales sin esa preferencia, no salte de industrial a doméstica. Si no hay ninguna, se mantiene la de menos unidades y la explicación lo indica.
+- **Ventiladores de confort:** un modelo con `"confort": true` en `ventiladores.json` (hoy el UR-623, de techo) no cuenta para el caudal porque no renueva el aire. Se muestra aparte como "Complemento de confort" en los locales con preferencia doméstica. Los campos `tipo` y `uso` definen el texto.
+- **Aviso de 220 V:** si la conexión eléctrica está en "Cualquiera" y el modelo mostrado es de 220 V, el resultado pide confirmar que el local tenga 220 V.
+- **Renovaciones:** valores DIN 1946 (Casals/Soler&Palau); por defecto se usa la media del rango (Calor de la zona = Medio; Bajo = zonas altas y frescas, Alto = costas y bajuras).
 - **Caudal requerido vs. brindado:** el resultado compara ambos (CFM) y muestra el 100 % de catálogo.
+
+## Escala de ruido (1–15)
+
+- La escala está en `src/data/escalaRuido.json` (nombre, rango en dB y ejemplo de cada nivel).
+- Cada modelo tiene `nivelRuido` (1–15) en `src/data/ventiladores.json`. **Editar ese número** según la experiencia de campo. Si un modelo no lo tiene, se convierte desde `ruidoMax` (cada nivel = 5 dB).
+- El filtro "¿Hay personas?" usa niveles: trabajando = hasta nivel 10, atención al público/oficina = hasta nivel 7, personalizado = el nivel elegido. Se configura en `src/data/ruido.json` (`maxNivel`).
