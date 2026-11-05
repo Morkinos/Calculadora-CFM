@@ -1,0 +1,17 @@
+[
+  {"nivel": 1, "nombre": "Casi inaudible", "db": "hasta 35 dB", "ejemplo": "Biblioteca vacía, susurro"},
+  {"nivel": 2, "nombre": "Muy silencioso", "db": "36–40 dB", "ejemplo": "Habitación en silencio de noche"},
+  {"nivel": 3, "nombre": "Silencioso", "db": "41–45 dB", "ejemplo": "Refrigerador, oficina vacía"},
+  {"nivel": 4, "nombre": "Bajo", "db": "46–50 dB", "ejemplo": "Oficina tranquila"},
+  {"nivel": 5, "nombre": "Bajo-medio", "db": "51–55 dB", "ejemplo": "Conversación en voz baja"},
+  {"nivel": 6, "nombre": "Medio", "db": "56–60 dB", "ejemplo": "Conversación normal, oficina con gente"},
+  {"nivel": 7, "nombre": "Medio-notorio", "db": "61–65 dB", "ejemplo": "Restaurante con clientes"},
+  {"nivel": 8, "nombre": "Notorio", "db": "66–70 dB", "ejemplo": "Tráfico cercano, aspiradora lejos"},
+  {"nivel": 9, "nombre": "Alto", "db": "71–75 dB", "ejemplo": "Aspiradora cerca; se sube la voz"},
+  {"nivel": 10, "nombre": "Muy alto", "db": "76–80 dB", "ejemplo": "Calle con mucho tráfico; cuesta conversar"},
+  {"nivel": 11, "nombre": "Fuerte", "db": "81–85 dB", "ejemplo": "Hay que gritar para hablar"},
+  {"nivel": 12, "nombre": "Molesto", "db": "86–90 dB", "ejemplo": "Taller con maquinaria; protección auditiva si es prolongado"},
+  {"nivel": 13, "nombre": "Muy molesto", "db": "91–95 dB", "ejemplo": "Máquinas pesadas, motosierra lejos"},
+  {"nivel": 14, "nombre": "Extremo", "db": "96–100 dB", "ejemplo": "Discoteca, esmeril cerca"},
+  {"nivel": 15, "nombre": "Insoportable", "db": "más de 100 dB", "ejemplo": "Sin protección auditiva no se tolera"}
+]
