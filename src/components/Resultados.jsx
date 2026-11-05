@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { nombreDe } from "../lib/calculo.js";
+import { nombreDe, explicarEleccion } from "../lib/calculo.js";
 import { IconoResultado } from "./Iconos.jsx";
 
 const n0 = new Intl.NumberFormat("es-CR", { maximumFractionDigits: 0 });
@@ -50,7 +50,44 @@ function Comparativa({ requeridoCfm, brindadoCfm, catalogoCfm, porLado, resultad
   );
 }
 
-export default function Resultados({ resultado, renovaciones, ruidoMaxDb, funcion = "cualquiera", entradaAire = true }) {
+// "¿Por qué este modelo?": frases sencillas para que el vendedor explique la recomendación al cliente, con botón para copiarlas.
+function PorQue({ titulo, lineas }) {
+  const [copiado, setCopiado] = useState(false);
+  if (lineas.length === 0) return null;
+  const copiar = async () => {
+    const texto = [titulo, ...lineas.map((l) => `• ${l}`)].join("\n");
+    try {
+      await navigator.clipboard.writeText(texto);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 2000);
+    } catch {
+      setCopiado(false);
+    }
+  };
+  return (
+    <div className="porque">
+      <h4>¿Por qué este modelo?</h4>
+      <ul>
+        {lineas.map((l) => (
+          <li key={l}>{l}</li>
+        ))}
+      </ul>
+      <button type="button" className="secundario boton-copiar" onClick={copiar}>
+        {copiado ? "✓ Explicación copiada" : "Copiar explicación"}
+      </button>
+    </div>
+  );
+}
+
+export default function Resultados({
+  resultado,
+  renovaciones,
+  nivelRuidoMax,
+  escalaRuido = [],
+  funcion = "cualquiera",
+  entradaAire = true,
+  voltajeElegido = "Cualquiera",
+}) {
   const [eleccion, setEleccion] = useState(null);
   const principalRef = useRef(null);
 
@@ -59,7 +96,8 @@ export default function Resultados({ resultado, renovaciones, ruidoMaxDb, funcio
     setEleccion(modelo);
     requestAnimationFrame(() => principalRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" }));
   };
-  const hayLimiteRuido = Number.isFinite(ruidoMaxDb);
+  const hayLimiteRuido = Number.isFinite(nivelRuidoMax);
+  const nombreNivel = (n) => escalaRuido.find((e) => e.nivel === n)?.nombre ?? "";
 
   if (!resultado) {
     return (
@@ -74,7 +112,7 @@ export default function Resultados({ resultado, renovaciones, ruidoMaxDb, funcio
           <ul className="vacio-lista">
             <li>Largo y ancho en metros</li>
             <li>Altura máxima (y mínima si el techo es inclinado)</li>
-            <li>Tipo de local, nivel de calor y contaminantes</li>
+            <li>Tipo de local, calor de la zona y contaminantes</li>
           </ul>
         </div>
       </section>
@@ -104,11 +142,13 @@ export default function Resultados({ resultado, renovaciones, ruidoMaxDb, funcio
       {!mejor ? (
         <p className="aviso">
           Ningún modelo del catálogo cumple con los filtros seleccionados (línea, voltaje, alcance
-          {hayLimiteRuido ? ` o límite de ${n0.format(ruidoMaxDb)} dB` : " o ruido"}). Pruebe cambiando alguno de ellos.
+          {hayLimiteRuido ? ` o límite de ruido nivel ${nivelRuidoMax}` : " o ruido"}). Pruebe cambiando alguno de ellos.
         </p>
       ) : (
         <>
           <div className="recomendado" ref={principalRef}>
+            <div className="recomendado-cols">
+            <div className="recomendado-principal">
             <span className="etiqueta">{esRecomendado ? "Más apto" : "Seleccionado por usted"}</span>
             <p className="modelo">
               {nombreDe(mejor)} <span className="x">× {mejor.unidades}</span>
@@ -141,7 +181,7 @@ export default function Resultados({ resultado, renovaciones, ruidoMaxDb, funcio
             {mejor.inyeccion && !mejor.extraccion && <p className="detalle">✓ Sirve para inyección de aire.</p>}
 
             <Comparativa
-              requeridoCfm={caudalRequeridoCfm}
+              requeridoCfm={mejor.requeridoCfm ?? caudalRequeridoCfm}
               brindadoCfm={mejor.caudalTotalCfm}
               catalogoCfm={mejor.caudalCatalogoCfm}
               porLado={mejor.enPareja}
@@ -151,15 +191,28 @@ export default function Resultados({ resultado, renovaciones, ruidoMaxDb, funcio
             <p className="detalle">
               {mejor.unidades === 1 ? "1 unidad" : `${mejor.unidades} unidades`} · {n1.format(mejor.renovacionesReales)} renovaciones/h
               reales · {n0.format(mejor.potenciaTotalW)} W en total · {mejor.voltaje} V
-              {mejor.ruidoMax ? ` · hasta ${mejor.ruidoMax} dB` : ""}
+              {mejor.nivelRuido ? ` · ruido nivel ${mejor.nivelRuido} de 15 (${nombreNivel(mejor.nivelRuido)})` : ""}
             </p>
+            {voltajeElegido === "Cualquiera" && mejor.voltaje === 220 && (
+              <p className="aviso">
+                ⚠ Este modelo funciona a 220 V. Confirme que el local tenga conexión de 220 V; si solo hay 120 V, elija «120 V» en Conexión
+                eléctrica para ver modelos compatibles.
+              </p>
+            )}
             {mejor.nota && <p className="nota">⚠ {mejor.nota}</p>}
             {hayLimiteRuido && (
               <p className="detalle">
-                Solo se consideran modelos de hasta {n0.format(ruidoMaxDb)} dB por unidad. Con varias unidades funcionando a la vez, el
+                Solo se consideran modelos de hasta nivel {nivelRuidoMax} de ruido ({nombreNivel(nivelRuidoMax)}) por unidad. Con varias unidades funcionando a la vez, el
                 ruido total en el local es mayor.
               </p>
             )}
+            </div>
+
+            <PorQue
+              titulo={`Recomendación VEGGA: ${nombreDe(mejor)} × ${mejor.unidades}`}
+              lineas={explicarEleccion({ resultado, opcion: mejor, renovaciones, nivelRuidoMax, nombreNivel })}
+            />
+            </div>
           </div>
 
           {otras.length > 0 && (
