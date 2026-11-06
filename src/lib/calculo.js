@@ -34,6 +34,10 @@ export const nivelRuidoDe = (f) => f.nivelRuido ?? (f.ruidoMax != null ? nivelDe
 
 /** Nombre que se muestra al usuario: solo el modelo (ej. "50T-W", "AIP-600"). */
 export const nombreDe = (f) => f.nombreMostrado ?? f.modelo;
+/** Nombre comercial (el que entiende el cliente), o el código del modelo si no tiene. */
+export const nombreVenta = (f) => f.nombreComercial ?? nombreDe(f);
+/** Nombre comercial con el código entre paréntesis, para textos: «Pie 20" (50T-S)». */
+export const etiquetaVenta = (f) => (f.nombreComercial ? `${f.nombreComercial} (${nombreDe(f)})` : nombreDe(f));
 
 /** Voltaje nominal para filtrar: 110 V y 120 V se consideran la misma conexión (120 V). */
 export const voltajeNominal = (f) => (f.voltaje === 110 ? 120 : f.voltaje);
@@ -218,6 +222,26 @@ export function aNumero(texto) {
   return limpio === "" ? NaN : Number(limpio);
 }
 
+/** Cómo se maneja el ventilador, en frase: "es de cordón" o "tiene control remoto". */
+function fraseControl(control) {
+  return control === "cordón" ? "es de cordón" : `tiene ${control}`;
+}
+
+/** Tipo y control juntos: "de pared con control remoto", "de pared de cordón", "de pie con perilla". */
+export function descripcionModelo(f) {
+  if (!f?.tipo) return "";
+  if (!f.control) return f.tipo;
+  return f.control === "cordón" ? `${f.tipo} de cordón` : `${f.tipo} con ${f.control}`;
+}
+
+/** Ruido en palabras, para explicarlo al cliente sin el número de la escala: bajo (1-4), medio (5-8), alto (9-11) o muy alto (12-15). */
+export function descripcionRuido(nivel) {
+  if (nivel <= 4) return "bajo";
+  if (nivel <= 8) return "medio";
+  if (nivel <= 11) return "alto";
+  return "muy alto";
+}
+
 const fmt0 = (n) => new Intl.NumberFormat("es-CR", { maximumFractionDigits: 0 }).format(n);
 const fmt1 = (n) => new Intl.NumberFormat("es-CR", { maximumFractionDigits: 1 }).format(n);
 
@@ -234,7 +258,8 @@ export function explicarEleccion({ resultado, opcion, renovaciones, nivelRuidoMa
   const { volumen, caudalRequeridoCfm, caudalPersonas, opciones } = resultado;
   const recomendado = opciones[0];
   const esRecomendado = opcion.modelo === recomendado.modelo;
-  const nombre = nombreDe(opcion);
+  const nombre = etiquetaVenta(opcion); // nombre comercial + código, para el cliente
+  const codigo = nombreDe(opcion); // solo el código, para frases cortas
   const lineas = [];
 
   // 1. Cuánto aire necesita el local.
@@ -261,15 +286,15 @@ export function explicarEleccion({ resultado, opcion, renovaciones, nivelRuidoMa
 
   // 3. Por qué esta opción y no otra.
   if (!esRecomendado) {
-    lineas.push(`Opción elegida manualmente. La recomendada por la calculadora es ${nombreDe(recomendado)} × ${recomendado.unidades}.`);
+    lineas.push(`Opción elegida manualmente. La recomendada por la calculadora es ${etiquetaVenta(recomendado)} × ${recomendado.unidades}.`);
   } else if (resultado.ajuste) {
     const otra = resultado.ajuste.reemplaza;
     lineas.push(
-      `Se prefirió sobre ${nombreDe(otra)} × ${otra.unidades}, que da ${fmt0(otra.exceso * 100)} % de aire de más: ` +
+      `Se prefirió sobre ${etiquetaVenta(otra)} × ${otra.unidades}, que da ${fmt0(otra.exceso * 100)} % de aire de más: ` +
         "esta opción queda más ajustada a lo que necesita el local, sin sobredimensionar."
     );
   } else if (opcion.preferida) {
-    lineas.push("Para este tipo de local se prefiere la línea doméstica, porque es más fácil de instalar.");
+    lineas.push(opcion.tipo ? `Es un ventilador ${descripcionModelo(opcion)}, fácil de instalar.` : "Es un modelo fácil de instalar.");
   } else {
     const empatadas = opciones.filter((o) => o !== opcion && o.unidades === opcion.unidades).length;
     lineas.push(
@@ -296,14 +321,13 @@ export function explicarEleccion({ resultado, opcion, renovaciones, nivelRuidoMa
     );
   }
 
-  // 4. Ruido.
+  // 4. Ruido, en palabras (sin el número de la escala).
   if (opcion.nivelRuido != null) {
-    const nombreRuido = nombreNivel(opcion.nivelRuido);
-    const ruido = `Ruido nivel ${opcion.nivelRuido} de 15${nombreRuido ? ` (${nombreRuido.toLowerCase()})` : ""}`;
+    const ruido = `Nivel de ruido ${descripcionRuido(opcion.nivelRuido)}`;
     lineas.push(
       Number.isFinite(nivelRuidoMax)
-        ? `${ruido}, dentro del límite de nivel ${nivelRuidoMax} para las personas que estarán en el local.`
-        : `${ruido}. No se aplicó límite de ruido porque no se indicaron personas en el local.`
+        ? `${ruido}, adecuado para las personas que estarán en el local.`
+        : `${ruido}. No se limitó el ruido porque no se indicaron personas en el local.`
     );
   }
 
@@ -316,8 +340,41 @@ export function explicarEleccion({ resultado, opcion, renovaciones, nivelRuidoMa
   // 6. Alternativa por si el cliente prefiere otra cosa.
   if (esRecomendado) {
     const siguiente = opciones.find((o) => o !== opcion);
-    if (siguiente) lineas.push(`Alternativa: ${nombreDe(siguiente)} × ${siguiente.unidades} (${fmt0(siguiente.exceso * 100)} % sobre lo necesario).`);
+    if (siguiente) {
+      let alternativa = `Alternativa: ${etiquetaVenta(siguiente)} × ${siguiente.unidades} (${fmt0(siguiente.exceso * 100)} % sobre lo necesario).`;
+      // Diferencia según el tipo y el control del catálogo (ej. VP-16C de pared de cordón, VP-16CR de pared con control remoto).
+      if (opcion.tipo && siguiente.tipo && opcion.tipo !== siguiente.tipo) {
+        alternativa += ` La diferencia es que el ${nombreDe(siguiente)} es ${descripcionModelo(siguiente)} y el ${codigo} es ${descripcionModelo(opcion)}.`;
+      } else if (opcion.control && siguiente.control && opcion.control !== siguiente.control) {
+        alternativa += ` La diferencia es que el ${nombreDe(siguiente)} ${fraseControl(siguiente.control)} y el ${codigo} ${fraseControl(opcion.control)}.`;
+      }
+      lineas.push(alternativa);
+    }
   }
 
   return lineas;
+}
+
+// Filtros que se prueban, uno a la vez, cuando ningún modelo cumple todo junto.
+// motivo: por qué no se puede calcular · accion: qué modificar (el orden define cuál se menciona primero).
+const AJUSTES_DIAGNOSTICO = [
+  { clave: "nivelRuidoMax", libre: Infinity, motivo: "el nivel de ruido es muy bajo y no cumple las condiciones", accion: "el nivel de ruido" },
+  { clave: "voltaje", libre: "Cualquiera", motivo: "la conexión eléctrica elegida no tiene modelos que cumplan las condiciones", accion: "la conexión eléctrica" },
+  { clave: "funcion", libre: "cualquiera", motivo: "el alcance requerido no tiene modelos que cumplan las condiciones", accion: "el alcance requerido" },
+  { clave: "linea", libre: "todas", motivo: "la línea de ventiladores elegida no tiene modelos que cumplan las condiciones", accion: "la línea de ventiladores" },
+];
+
+/**
+ * Cuando ningún modelo cumple todos los filtros a la vez, prueba quitando uno por uno
+ * (ruido, voltaje, alcance y línea) y devuelve los cambios que sí darían una recomendación,
+ * con el motivo, qué modificar y el modelo que se recomendaría: [{ motivo, accion, opcion }].
+ */
+export function diagnosticarSinOpciones(entrada, catalogo) {
+  const sugerencias = [];
+  for (const a of AJUSTES_DIAGNOSTICO) {
+    if ((entrada[a.clave] ?? a.libre) === a.libre) continue; // ese filtro no está activo
+    const r = calcular({ ...entrada, [a.clave]: a.libre }, catalogo);
+    if (r?.opciones.length) sugerencias.push({ motivo: a.motivo, accion: a.accion, opcion: r.opciones[0] });
+  }
+  return sugerencias;
 }

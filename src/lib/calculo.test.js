@@ -1,7 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { nivelDeDb, nivelRuidoDe, calcular, aNumero, nombreDe, renovacionesDe, explicarEleccion } from "./calculo.js";
+import { nivelDeDb, nivelRuidoDe, calcular, aNumero, nombreDe, renovacionesDe, explicarEleccion, diagnosticarSinOpciones, descripcionModelo } from "./calculo.js";
 
 const catalogo = JSON.parse(readFileSync(new URL("../data/ventiladores.json", import.meta.url)));
 
@@ -254,9 +254,9 @@ test("explicarEleccion describe caudal, cantidad, motivo, ruido, consumo y alter
   const lineas = explicarEleccion({ resultado: r, opcion: r.opciones[0], renovaciones: 10, nivelRuidoMax: 10, nombreNivel: () => "Alto" });
   assert.equal(lineas.length, 6);
   assert.match(lineas[0].replace(/\D(?=\d{3}\b)/g, ""), /1440 m³/);
-  assert.match(lineas[1], /^2 50T-S mueven/);
+  assert.match(lineas[1], /^2 Pie 20" \(50T-S\) mueven/);
   assert.match(lineas[2], /menos equipos/);
-  assert.match(lineas[3], /dentro del límite de nivel 10/);
+  assert.match(lineas[3], /^Nivel de ruido alto, adecuado para las personas/);
   assert.match(lineas[5], /^Alternativa:/);
 });
 
@@ -275,7 +275,7 @@ test("UR-623 (techo) cuenta para el caudal, pero en espacios de más de 30 m² n
   const ur = grande.opciones.find((o) => o.modelo === "UR-623");
   assert.ok(ur && ur.relegado);
   assert.notEqual(grande.opciones[0].modelo, "UR-623");
-  assert.equal(grande.opciones.at(-1).modelo, "UR-623");
+  assert.ok(grande.opciones.slice(-2).every((o) => o.techo)); // UR-623 y VO-16 (de techo) al final
   const lineas = explicarEleccion({ resultado: grande, opcion: ur, renovaciones: 6 });
   assert.match(lineas.join(" "), /ventilador de techo: en espacios de más de 30 m²/);
 });
@@ -305,7 +305,7 @@ test("tolerancia: taller de soldadura 18x10x4 cambia 1 AXIAL 9,5 (+41 %) por 2 �
   assert.equal(mejor(r), "50T-S x2");
   assert.equal(r.ajuste.reemplaza.modelo, "AXIAL 9,5");
   const lineas = explicarEleccion({ resultado: r, opcion: r.opciones[0], renovaciones: 25 });
-  assert.match(lineas.join(" "), /Se prefirió sobre AXIAL 9,5 × 1/);
+  assert.match(lineas.join(" "), /Se prefirió sobre Axial GLF 9\.5 \(AXIAL 9,5\) × 1/);
 });
 
 test("tolerancia: bodega 15x10x5 con personas trabajando → 2 × XDF-45 en vez de 1 × 50T-S (+73 %)", () => {
@@ -333,4 +333,39 @@ test("tolerancia: el exceso se mide contra el caudal pedido con la barra (125 %)
   const o = r.opciones[0];
   assert.ok(Math.abs(o.excesoPedido - (o.caudalTotal / (r.caudalRequerido * 1.25) - 1)) < 1e-9);
   if (r.ajuste) assert.ok(o.excesoPedido <= 0.3);
+});
+
+test("sin opciones: fábrica con personas (nivel 10) y 220 V sugiere quitar el ruido o el voltaje", () => {
+  const entrada = { largo: 30, ancho: 10, alto: 10, renovaciones: 30, linea: "todas", nivelRuidoMax: 10, voltaje: "220V" };
+  assert.equal(calcular(entrada, catalogo).opciones.length, 0);
+  const s = diagnosticarSinOpciones(entrada, catalogo);
+  assert.equal(s.length, 2);
+  assert.match(s[0].motivo, /nivel de ruido es muy bajo/);
+  assert.equal(s[0].opcion.modelo, "AXIAL 12,5");
+  assert.equal(s[1].accion, "la conexión eléctrica");
+  assert.equal(s[1].opcion.modelo, "FF-60M");
+});
+
+test("explicación: VP-16C recomendado en oficina dice fácil de instalar, ruido en palabras y la diferencia con el VP-16CR", () => {
+  const r = calcular({ largo: 6, ancho: 5, alto: 6, renovaciones: 12, linea: "todas", nivelRuidoMax: 7, preferirLinea: "domestica" }, catalogo);
+  const vp = r.opciones.find((o) => o.modelo === "VP-16C");
+  const lineas = explicarEleccion({ resultado: { ...r, opciones: [vp, r.opciones.find((o) => o.modelo === "VP-16CR")] }, opcion: vp, renovaciones: 12, nivelRuidoMax: 7 });
+  const texto = lineas.join(" ");
+  assert.match(texto, /Es un ventilador de pared de cordón, fácil de instalar\./);
+  assert.match(texto, /Nivel de ruido medio, adecuado/);
+  assert.doesNotMatch(texto, /de 15/);
+  assert.match(texto, /el VP-16CR tiene control remoto y el VP-16C es de cordón/);
+});
+
+test("domésticos: descripción de tipo y control, y diferencia cuando el tipo cambia", () => {
+  const por = Object.fromEntries(catalogo.map((f) => [f.modelo, f]));
+  assert.equal(descripcionModelo(por["VP-16CR"]), "de pared con control remoto");
+  assert.equal(descripcionModelo(por["FS-40"]), "de pie con perilla");
+  assert.equal(descripcionModelo(por["LF-18"]), "3 en 1 (pie, pared o mesa) con perilla");
+  assert.equal(por["VO-16"].techo, true);
+  const r = calcular({ largo: 6, ancho: 5, alto: 3, renovaciones: 12, linea: "domestica", nivelRuidoMax: 7, preferirLinea: "domestica" }, catalogo);
+  const a = r.opciones.find((o) => o.modelo === "FS-45");
+  const b = r.opciones.find((o) => o.modelo === "VP-16C");
+  const lineas = explicarEleccion({ resultado: { ...r, opciones: [a, b] }, opcion: a, renovaciones: 12, nivelRuidoMax: 7 });
+  assert.match(lineas.at(-1), /el VP-16C es de pared de cordón y el FS-45 es de pie con botones/);
 });
