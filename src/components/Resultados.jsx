@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { nombreDe, explicarEleccion } from "../lib/calculo.js";
+import { nombreDe, nombreVenta, etiquetaVenta, explicarEleccion } from "../lib/calculo.js";
 import { IconoResultado } from "./Iconos.jsx";
 
 const n0 = new Intl.NumberFormat("es-CR", { maximumFractionDigits: 0 });
@@ -50,6 +50,34 @@ function Comparativa({ requeridoCfm, brindadoCfm, catalogoCfm, porLado, resultad
   );
 }
 
+// Foto, nombre comercial, características y ficha técnica del modelo (datos de ventiladores.json; las imágenes
+// están en public/img/ventiladores/<foto>.webp y <foto>-ficha.webp). Si el modelo no tiene datos, no se muestra nada.
+function FichaModelo({ modelo }) {
+  if (!modelo.foto && !modelo.destacados?.length) return null;
+  const ruta = (archivo) => `img/ventiladores/${archivo}`;
+  return (
+    <div className="ficha-modelo">
+      {modelo.foto && (
+        <img src={ruta(`${modelo.foto}.webp`)} alt={`Ventilador ${modelo.modelo}`} loading="lazy" decoding="async" width="120" height="120" />
+      )}
+      <div className="ficha-texto">
+        {modelo.destacados?.length > 0 && (
+          <ul className="ficha-destacados">
+            {modelo.destacados.map((d) => (
+              <li key={d}>{d}</li>
+            ))}
+          </ul>
+        )}
+        {modelo.foto && (
+          <a className="ficha-enlace" href={ruta(`${modelo.foto}-ficha.webp`)} target="_blank" rel="noopener noreferrer">
+            Ver ficha técnica ↗
+          </a>
+        )}
+      </div>
+    </div>
+  );
+}
+
 // "¿Por qué este modelo?": frases sencillas para que el vendedor explique la recomendación al cliente, con botón para copiarlas.
 function PorQue({ titulo, lineas }) {
   const [copiado, setCopiado] = useState(false);
@@ -87,6 +115,7 @@ export default function Resultados({
   funcion = "cualquiera",
   entradaAire = true,
   voltajeElegido = "Cualquiera",
+  sugerencias = [],
 }) {
   const [eleccion, setEleccion] = useState(null);
   const principalRef = useRef(null);
@@ -140,10 +169,24 @@ export default function Resultados({
       <p className="equivalencia">También equivale a {n0.format(caudalRequeridoLps)} l/s.</p>
 
       {!mejor ? (
-        <p className="aviso">
-          Ningún modelo del catálogo cumple con los filtros seleccionados (línea, voltaje, alcance
-          {hayLimiteRuido ? ` o límite de ruido nivel ${nivelRuidoMax}` : " o ruido"}). Pruebe cambiando alguno de ellos.
-        </p>
+        <div className="aviso aviso-bloqueo" role="alert">
+          {sugerencias.length > 0 ? (
+            <>
+              <p className="aviso-titulo">
+                ⚠️ No se puede calcular por: {sugerencias[0].motivo}. Modifique{" "}
+                {sugerencias.map((s) => s.accion).join(" o ")}. ⚠️
+              </p>
+              <p className="aviso-detalle">
+                {sugerencias.map((s) => `Si modifica ${s.accion}: ${etiquetaVenta(s.opcion)} × ${s.opcion.unidades}`).join(" · ")}
+              </p>
+            </>
+          ) : (
+            <p className="aviso-titulo">
+              ⚠️ No se puede calcular por: ningún modelo cumple todas las condiciones juntas. Modifique la línea, la conexión eléctrica, el
+              alcance o el nivel de ruido. ⚠️
+            </p>
+          )}
+        </div>
       ) : (
         <>
           <div className="recomendado" ref={principalRef}>
@@ -151,11 +194,16 @@ export default function Resultados({
             <div className="recomendado-principal">
             <span className="etiqueta">{esRecomendado ? "Más apto" : "Seleccionado por usted"}</span>
             <p className="modelo">
-              {nombreDe(mejor)} <span className="x">× {mejor.unidades}</span>
+              {nombreVenta(mejor)} <span className="x">× {mejor.unidades}</span>
             </p>
+            <p className="modelo-codigo">
+              {(mejor.linea ?? "industrial") === "domestica" ? "Ventilador doméstico" : "Ventilador industrial"} · Modelo {nombreDe(mejor)}
+              {mejor.codigo ? ` · Código ${mejor.codigo}` : ""}
+            </p>
+            <FichaModelo modelo={mejor} />
             {!esRecomendado && (
               <button type="button" className="enlace-boton" onClick={() => setEleccion(null)}>
-                ← Volver a la recomendada ({nombreDe(recomendado)} × {recomendado.unidades})
+                ← Volver a la recomendada ({etiquetaVenta(recomendado)} × {recomendado.unidades})
               </button>
             )}
             {mejor.preferida && (
@@ -209,7 +257,7 @@ export default function Resultados({
             </div>
 
             <PorQue
-              titulo={`Recomendación VEGGA: ${nombreDe(mejor)} × ${mejor.unidades}`}
+              titulo={`Recomendación VEGGA: ${etiquetaVenta(mejor)} × ${mejor.unidades}`}
               lineas={explicarEleccion({ resultado, opcion: mejor, renovaciones, nivelRuidoMax, nombreNivel })}
             />
             </div>
@@ -238,7 +286,7 @@ export default function Resultados({
                         className="fila-elegible"
                         tabIndex={0}
                         role="button"
-                        aria-label={`Ver ${nombreDe(o)} como resultado principal`}
+                        aria-label={`Ver ${etiquetaVenta(o)} como resultado principal`}
                         onClick={() => elegir(o.modelo)}
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") {
@@ -248,7 +296,8 @@ export default function Resultados({
                         }}
                       >
                         <td data-label="Modelo">
-                          {nombreDe(o)}
+                          <span className="celda-nombre">{nombreVenta(o)}</span>
+                          {o.nombreComercial && <span className="celda-codigo">{nombreDe(o)}</span>}
                           {o === recomendado && <span className="mini-etiqueta">Más apto</span>}
                           {o.nota && <span title={o.nota}> ⚠</span>}
                         </td>
