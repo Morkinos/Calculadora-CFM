@@ -41,11 +41,11 @@ test("límite de ruido nivel 7: solo modelos de nivel ≤ 7 (los domésticos); n
   assert.ok(!r.opciones.some((o) => o.axial));
 });
 
-test("límite de ruido nivel 10 excluye DF750, DF600 y los axiales, pero deja 50-FQ y 50T-W", () => {
+test("límite de ruido nivel 10 excluye los AXIAL y el AIP-600, pero deja AIP-500, DF600, DF750, 50-FQ y 50T-W", () => {
   const r = calcular({ largo: 20, ancho: 10, alto: 5, renovaciones: 10, eficiencia: 0.8, linea: "industrial", nivelRuidoMax: 10 }, catalogo);
   const nombres = r.opciones.map((o) => o.modelo);
-  assert.ok(!nombres.includes("DF750") && !nombres.includes("DF600") && !nombres.includes("AXIAL 9,5"));
-  assert.ok(nombres.includes("50-FQ") && nombres.includes("50T-W"));
+  assert.ok(!nombres.includes("AXIAL 9,5") && !nombres.includes("AXIAL 12,5") && !nombres.some((n) => n.includes("AIP60")));
+  assert.ok(["FAD50-4 (AIP50)", "DF600", "DF750", "50-FQ", "50T-W"].every((n) => nombres.includes(n)));
 });
 
 test("límite de ruido imposible → sin opciones", () => {
@@ -243,10 +243,11 @@ test("cada tipo de local trae una opción de personas válida por defecto", () =
   assert.equal(localesData.find((l) => l.nombre === "Oficina").personas, "bajo");
 });
 
-test("bodega con personas trabajando (nivel 10) ya no recomienda axiales", () => {
+test("bodega con personas trabajando (nivel 10): fuera los AXIAL grandes; todas las opciones hasta nivel 10", () => {
   const r = calcular({ largo: 30, ancho: 20, alto: 7, renovaciones: 10, linea: "todas", nivelRuidoMax: 10 }, catalogo);
-  assert.ok(r.opciones.every((o) => !o.axial));
-  assert.ok(r.opciones[0].nivelRuido <= 10);
+  assert.ok(r.opciones.every((o) => !o.modelo.startsWith("AXIAL")));
+  assert.ok(r.opciones.every((o) => o.nivelRuido <= 10));
+  assert.equal(r.opciones[0].modelo, "DF750");
 });
 
 test("explicarEleccion describe caudal, cantidad, motivo, ruido, consumo y alternativa", () => {
@@ -254,7 +255,7 @@ test("explicarEleccion describe caudal, cantidad, motivo, ruido, consumo y alter
   const lineas = explicarEleccion({ resultado: r, opcion: r.opciones[0], renovaciones: 10, nivelRuidoMax: 10, nombreNivel: () => "Alto" });
   assert.equal(lineas.length, 6);
   assert.match(lineas[0].replace(/\D(?=\d{3}\b)/g, ""), /1440 m³/);
-  assert.match(lineas[1], /^2 Pie 20" \(50T-S\) mueven/);
+  assert.match(lineas[1], /^1 Pared 30" \(DF750\) mueve/);
   assert.match(lineas[2], /menos equipos/);
   assert.match(lineas[3], /^Nivel de ruido alto, adecuado para las personas/);
   assert.match(lineas[5], /^Alternativa:/);
@@ -343,7 +344,7 @@ test("sin opciones: fábrica con personas (nivel 10) y 220 V sugiere quitar el r
   assert.match(s[0].motivo, /nivel de ruido es muy bajo/);
   assert.equal(s[0].opcion.modelo, "AXIAL 12,5");
   assert.equal(s[1].accion, "la conexión eléctrica");
-  assert.equal(s[1].opcion.modelo, "FF-60M");
+  assert.equal(s[1].opcion.modelo, "DF750");
 });
 
 test("explicación: VP-16C recomendado en oficina dice fácil de instalar, ruido en palabras y la diferencia con el VP-16CR", () => {
