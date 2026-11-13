@@ -41,7 +41,7 @@ test("límite de ruido nivel 7: solo modelos de nivel ≤ 7 (los domésticos); n
   assert.ok(!r.opciones.some((o) => o.axial));
 });
 
-test("límite de ruido nivel 10 excluye los AXIAL y el AIP-600, pero deja AIP-500, DF600, DF750, 50-FQ y 50T-W", () => {
+test("límite de ruido nivel 10 excluye los AXIAL y el AIP-60, pero deja AIP-50, DF600, DF750, 50-FQ y 50T-W", () => {
   const r = calcular({ largo: 20, ancho: 10, alto: 5, renovaciones: 10, eficiencia: 0.8, linea: "industrial", nivelRuidoMax: 10 }, catalogo);
   const nombres = r.opciones.map((o) => o.modelo);
   assert.ok(!nombres.includes("AXIAL 9,5") && !nombres.includes("AXIAL 12,5") && !nombres.some((n) => n.includes("AIP60")));
@@ -64,12 +64,12 @@ test("extracción + 110V + nivel ≤ 13 → solo los AIP", () => {
     { largo: 20, ancho: 10, alto: 5, renovaciones: 10, eficiencia: 0.8, funcion: "extraccion", voltaje: "120V", nivelRuidoMax: 13 },
     catalogo
   );
-  assert.deepEqual(r.opciones.map((o) => nombreDe(o)).sort(), ["AIP-500", "AIP-600"]);
+  assert.deepEqual(r.opciones.map((o) => nombreDe(o)).sort(), ["AIP-50", "AIP-60"]);
 });
 
 test("nombre mostrado: solo el modelo", () => {
   assert.equal(nombreDe({ modelo: "50T-W" }), "50T-W");
-  assert.equal(nombreDe({ modelo: "FAD60-4 (AIP60)", nombreMostrado: "AIP-600" }), "AIP-600");
+  assert.equal(nombreDe({ modelo: "FAD60-4 (AIP60)", nombreMostrado: "AIP-60" }), "AIP-60");
 });
 
 test("ejemplo DIN 1946 de la lámina: almacén 5x10x20, 7 ren/h → 1000 m³ y 7000 m³/h", () => {
@@ -208,7 +208,7 @@ test("caudal brindado por lado en catálogo (CFM) = unidades por lado × CFM del
   assert.ok(Math.abs(o.caudalCatalogoCfm - o.unidadesPorLado * 7600) < 1e-6);
 });
 
-test("AIP-500/AIP-600 son axiales: sin entrada de aire van en pareja", () => {
+test("AIP-50/AIP-60 son axiales: sin entrada de aire van en pareja", () => {
   const r = calcular({ largo: 10, ancho: 10, alto: 4, renovaciones: 8, eficiencia: 0.8, linea: "industrial", entradaAire: false }, catalogo);
   const aip = r.opciones.filter((o) => nombreDe(o).startsWith("AIP"));
   assert.equal(aip.length, 2);
@@ -369,4 +369,80 @@ test("domésticos: descripción de tipo y control, y diferencia cuando el tipo c
   const b = r.opciones.find((o) => o.modelo === "VP-16C");
   const lineas = explicarEleccion({ resultado: { ...r, opciones: [a, b] }, opcion: a, renovaciones: 12, nivelRuidoMax: 7 });
   assert.match(lineas.at(-1), /el VP-16C es de pared de cordón y el FS-45 es de pie con botones/);
+});
+
+// ── Cobertura en m² (dato de la ficha) ──────────────────────────────────────
+test("cobertura: aula de 80 m² pide 4 VP-16C (20 m² c/u) aunque por caudal bastaba 1", () => {
+  const base = { largo: 10, ancho: 8, alto: 3, renovaciones: 6, linea: "todas", nivelRuidoMax: 7, preferirLinea: "domestica" };
+  const sin = calcular(base, catalogo);
+  const con = calcular({ ...base, usarCobertura: "domesticos" }, catalogo);
+  assert.equal(sin.opciones[0].unidades, 1);
+  assert.equal(mejor(con), "VP-16C x4");
+  assert.equal(con.opciones[0].unidadesPorArea, 4);
+  assert.equal(con.ajuste, null);
+  assert.equal(con.sinAjuste, false, "con cantidad por área no se busca opción más ajustada");
+  const lineas = explicarEleccion({ resultado: con, opcion: con.opciones[0], renovaciones: 6, nivelRuidoMax: 7 });
+  assert.match(lineas.join(" "), /Cada VP-16C cubre unos 20 m² y el local mide 80 m², así que hacen falta 4/);
+});
+
+test("cobertura 'domesticos' no cambia a los industriales", () => {
+  const base = { largo: 20, ancho: 12, alto: 6, renovaciones: 7, linea: "industrial", nivelRuidoMax: 10 };
+  const a = calcular(base, catalogo).opciones.map((o) => `${o.modelo}x${o.unidades}`);
+  const b = calcular({ ...base, usarCobertura: "domesticos" }, catalogo).opciones.map((o) => `${o.modelo}x${o.unidades}`);
+  assert.deepEqual(a, b);
+});
+
+test("cobertura 'todos': un 50T-S cubre 28 m², así que 240 m² piden 9", () => {
+  const r = calcular({ largo: 20, ancho: 12, alto: 6, renovaciones: 7, linea: "industrial", usarCobertura: "todos" }, catalogo);
+  assert.equal(r.opciones.find((o) => o.modelo === "50T-S").unidadesPorArea, 9);
+});
+
+// ── Tipo de ventilador (pared / piso / techo) ───────────────────────────────
+test("tipo de ventilador: techo deja solo XDF-45, UR-623 y VO-16, sin relegarlos aunque el local sea grande", () => {
+  const r = calcular({ largo: 10, ancho: 8, alto: 3, renovaciones: 6, linea: "todas", montaje: "techo" }, catalogo);
+  assert.deepEqual(r.opciones.map((o) => o.modelo).sort(), ["UR-623", "VO-16", "XDF-45"]);
+  assert.ok(r.opciones.every((o) => !o.relegado));
+});
+
+test("tipo de ventilador: el LF-18 (3 en 1) aparece en pared y en piso", () => {
+  const base = { largo: 6, ancho: 5, alto: 3, renovaciones: 6, linea: "domestica" };
+  for (const montaje of ["pared", "piso"]) {
+    assert.ok(calcular({ ...base, montaje }, catalogo).opciones.some((o) => o.modelo === "LF-18"), montaje);
+  }
+  assert.ok(!calcular({ ...base, montaje: "techo" }, catalogo).opciones.some((o) => o.modelo === "LF-18"));
+});
+
+test("tipo de ventilador sin modelos: el diagnóstico sugiere modificarlo", () => {
+  const entrada = { largo: 10, ancho: 8, alto: 3, renovaciones: 6, linea: "todas", montaje: "techo", voltaje: "220V" };
+  assert.equal(calcular(entrada, catalogo).opciones.length, 0);
+  const acciones = diagnosticarSinOpciones(entrada, catalogo).map((s) => s.accion);
+  assert.ok(acciones.includes("el tipo de ventilador"));
+});
+
+// ── Mínimo por personas (más gente = más calor) ─────────────────────────────
+test("personas: 30 estudiantes piden al menos 3 ventiladores", () => {
+  const r = calcular({ largo: 7, ancho: 6, alto: 3, renovaciones: 6, linea: "todas", nivelRuidoMax: 7, preferirLinea: "domestica", personas: 30, m3hPorPersona: 17, m3hPorM2: 2.2, usarCobertura: "domesticos" }, catalogo);
+  assert.ok(r.opciones.filter((o) => !o.axial).every((o) => o.unidades >= 3));
+  assert.equal(r.opciones[0].unidades, 3);
+});
+
+test("personas: cuando la gente manda, la explicación lo dice (oficina 6 × 5 con 40 personas)", () => {
+  const r = calcular({ largo: 6, ancho: 5, alto: 3, renovaciones: 6, linea: "todas", nivelRuidoMax: 7, preferirLinea: "domestica", personas: 40, m3hPorPersona: 8.5, m3hPorM2: 1.1, usarCobertura: "domesticos" }, catalogo);
+  const o = r.opciones[0];
+  assert.equal(o.unidadesPorPersonas, 4);
+  assert.equal(o.unidades, 4);
+  const texto = explicarEleccion({ resultado: r, opcion: o, renovaciones: 6, nivelRuidoMax: 7 }).join(" ");
+  assert.match(texto, /Hay 40 personas en el local.*al menos 1 ventilador por cada 10 personas, así que hacen falta 4/);
+});
+
+test("personas: no aplica a los axiales, que renuevan el aire del local", () => {
+  const r = calcular({ largo: 60, ancho: 30, alto: 8, renovaciones: 15, linea: "industrial", personas: 200, m3hPorPersona: 17, m3hPorM2: 1.1 }, catalogo);
+  const axial = r.opciones.find((o) => o.modelo === "AXIAL 12,5");
+  assert.equal(axial.unidadesPorPersonas, 0);
+  assert.ok(r.opciones.filter((o) => !o.axial).every((o) => o.unidades >= 20));
+});
+
+test("personas: sin cantidad de personas no hay mínimo", () => {
+  const r = calcular({ largo: 7, ancho: 6, alto: 3, renovaciones: 6, linea: "todas" }, catalogo);
+  assert.ok(r.opciones.every((o) => o.unidadesPorPersonas === 0));
 });

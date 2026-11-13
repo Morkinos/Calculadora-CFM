@@ -22,6 +22,9 @@ export const FACTOR_DOMESTICO_SIN_ENTRADA = 1.25;
 // Ventiladores de techo (campo "techo": true, ej. UR-623): en espacios de más de estos m² de piso no pueden ser
 // la primera opción por el tipo de instalación (en aulas se prefieren los de pared, como VP-16C o VP-16CR).
 export const AREA_MAX_TECHO_M2 = 30;
+// Más personas = más calor: al menos 1 ventilador por cada tantas personas (no aplica a los axiales,
+// que renuevan el aire del local en vez de refrescar a las personas).
+export const PERSONAS_POR_VENTILADOR = 10;
 
 /** Nivel de ruido (1–15) equivalente a un valor en dB: cada nivel agrupa 5 dB (nivel 1 = hasta 35 dB; 15 = más de 100). */
 export const nivelDeDb = (db) => Math.min(15, Math.max(1, Math.ceil((db - 30) / 5)));
@@ -32,7 +35,7 @@ export const nivelDeDb = (db) => Math.min(15, Math.max(1, Math.ceil((db - 30) / 
  */
 export const nivelRuidoDe = (f) => f.nivelRuido ?? (f.ruidoMax != null ? nivelDeDb(f.ruidoMax) : null);
 
-/** Nombre que se muestra al usuario: solo el modelo (ej. "50T-W", "AIP-600"). */
+/** Nombre que se muestra al usuario: solo el modelo (ej. "50T-W", "AIP-60"). */
 export const nombreDe = (f) => f.nombreMostrado ?? f.modelo;
 /** Nombre comercial (el que entiende el cliente), o el código del modelo si no tiene. */
 export const nombreVenta = (f) => f.nombreComercial ?? nombreDe(f);
@@ -99,6 +102,10 @@ export function calcular(entrada, catalogo) {
     funcion = "cualquiera",
     entradaAire = true,
     preferirLinea = null,
+    // Cobertura en m² de la ficha: "no" (solo CFM), "domesticos" o "todos" los modelos que tienen coberturaM2.
+    usarCobertura = "no",
+    // Tipo de ventilador según su instalación: "cualquiera" | "pared" | "piso" | "techo" (campo "montaje" del catálogo).
+    montaje = "cualquiera",
   } = entrada;
 
   if (![largo, ancho, alto, renovaciones].every((n) => Number.isFinite(n) && n > 0)) return null;
@@ -120,6 +127,7 @@ export function calcular(entrada, catalogo) {
   const opciones = catalogo
     .filter((f) => caudalCatalogoM3h(f) > 0)
     .filter(cumpleLineaYVoltaje)
+    .filter((f) => montaje === "cualquiera" || (f.montaje ?? []).includes(montaje))
     // Función requerida: solo modelos marcados para extraer / inyectar aire. "ambas" = el modelo debe poder hacer las dos.
     .filter((f) => funcion === "cualquiera" || (funcion === "ambas" ? f.extraccion === true && f.inyeccion === true : f[funcion] === true))
     // Límite de ruido por unidad (nivel 1–15). Sin dato de ruido no se puede garantizar el límite.
@@ -130,7 +138,14 @@ export function calcular(entrada, catalogo) {
       const factorSinEntrada = entradaAire === false && (f.linea ?? "industrial") === "domestica" ? FACTOR_DOMESTICO_SIN_ENTRADA : 1;
       const requeridoModelo = caudalRequerido * factorSinEntrada; // m³/h que se le pide a este modelo
       // Unidades necesarias para mover el caudal requerido por un lado (inyección o extracción).
-      const unidadesPorLado = Math.max(1, Math.ceil((requeridoModelo * margen) / caudalUnidad - 1e-9));
+      // Unidades por caudal (CFM) y, si aplica, por área cubierta (m² del piso ÷ cobertura del modelo según su ficha).
+      const unidadesPorCaudal = Math.max(1, Math.ceil((requeridoModelo * margen) / caudalUnidad - 1e-9));
+      const aplicaCobertura =
+        f.coberturaM2 > 0 && (usarCobertura === "todos" || (usarCobertura === "domesticos" && (f.linea ?? "industrial") === "domestica"));
+      const unidadesPorArea = aplicaCobertura ? Math.ceil(area / f.coberturaM2 - 1e-9) : 0;
+      // Mínimo por personas: más gente genera más calor (ej. 30 estudiantes → al menos 3 ventiladores).
+      const unidadesPorPersonas = hayPersonas && !f.axial ? Math.ceil(personas / PERSONAS_POR_VENTILADOR - 1e-9) : 0;
+      const unidadesPorLado = Math.max(unidadesPorCaudal, unidadesPorArea, unidadesPorPersonas);
       // Sin entrada de aire, los axiales van en pareja: mismas unidades para inyectar y para extraer.
       const enPareja = funcion === "ambas" || (f.axial === true && entradaAire === false);
       const unidades = enPareja ? unidadesPorLado * 2 : unidadesPorLado;
@@ -140,6 +155,9 @@ export function calcular(entrada, catalogo) {
         caudalUnidad,
         unidades,
         unidadesPorLado,
+        unidadesPorCaudal,
+        unidadesPorArea,
+        unidadesPorPersonas,
         enPareja,
         caudalTotal,
         caudalTotalCfm: caudalTotal * CFM_POR_M3H,
@@ -150,7 +168,8 @@ export function calcular(entrada, catalogo) {
         // Exceso contra el caudal pedido con la barra "Caudal a cubrir" (es el que usa la tolerancia).
         excesoPedido: caudalTotal / (requeridoModelo * margen) - 1,
         // De techo en un espacio grande: queda al final de la lista (no puede ser la recomendada si hay otra opción).
-        relegado: f.techo === true && area > AREA_MAX_TECHO_M2,
+        // Si el vendedor pidió ventiladores de techo, no se relegan.
+        relegado: f.techo === true && area > AREA_MAX_TECHO_M2 && montaje !== "techo",
         preferida: preferirLinea != null && (f.linea ?? "industrial") === preferirLinea && unidades <= MAX_UNIDADES_PREFERIDA,
         nivelRuido: nivelRuidoDe(f),
         potenciaTotalW: unidades * f.potenciaW,
@@ -174,6 +193,8 @@ export function calcular(entrada, catalogo) {
     caudalPersonas,
     caudalRequeridoCfm: caudalRequerido * CFM_POR_M3H,
     caudalRequeridoLps: caudalRequerido * LPS_POR_M3H,
+    area,
+    personas: hayPersonas ? personas : 0,
     opciones,
     ajuste,
     sinAjuste,
@@ -194,6 +215,9 @@ export function calcular(entrada, catalogo) {
 function elegirAjustada(opciones, preferirLinea) {
   const primera = opciones[0];
   if (!primera || primera.excesoPedido <= TOLERANCIA_EXCESO) return { ajuste: null, sinAjuste: false };
+  // Si la cantidad la define el área cubierta o la cantidad de personas (no el caudal), el aire de más es inevitable:
+  // no se busca otra opción.
+  if (primera.unidadesPorLado > primera.unidadesPorCaudal) return { ajuste: null, sinAjuste: false };
   const esDomestica = (o) => (o.linea ?? "industrial") === "domestica";
   const candidatas = opciones
     .filter(
@@ -269,8 +293,11 @@ export function explicarEleccion({ resultado, opcion, renovaciones, nivelRuidoMa
   );
 
   // 2. Cuánto aire brindan las unidades recomendadas.
-  const cobertura =
-    opcion.exceso >= 0
+  // ¿La cantidad la define algo distinto del caudal (área cubierta o personas)?
+  const porArea = (o) => o.unidadesPorLado > o.unidadesPorCaudal;
+  const cobertura = porArea(opcion)
+    ? `más que los ${fmt0(opcion.requeridoCfm ?? caudalRequeridoCfm)} CFM que necesita el local`
+    : opcion.exceso >= 0
       ? `${fmt0(opcion.exceso * 100)} % por encima de lo necesario`
       : `el ${fmt0((1 + opcion.exceso) * 100)} % de lo necesario (caudal a cubrir reducido)`;
   if (opcion.enPareja) {
@@ -282,6 +309,22 @@ export function explicarEleccion({ resultado, opcion, renovaciones, nivelRuidoMa
   } else {
     const verbo = opcion.unidades === 1 ? "mueve" : "mueven";
     lineas.push(`${opcion.unidades} ${nombre} ${verbo} ${fmt0(opcion.caudalTotalCfm)} CFM reales (80 % del catálogo), ${cobertura}.`);
+  }
+
+  // 2b. Si la cantidad la define el área que cubre cada ventilador (dato de la ficha) o la cantidad de personas.
+  const manda = porArea(opcion) ? (opcion.unidadesPorArea >= opcion.unidadesPorPersonas ? "area" : "personas") : null;
+  if (manda === "personas") {
+    lineas.push(
+      `Hay ${fmt0(resultado.personas)} personas en el local, y más personas generan más calor: se recomienda al menos 1 ventilador ` +
+        `por cada ${PERSONAS_POR_VENTILADOR} personas, así que hacen falta ${opcion.unidadesPorPersonas} ` +
+        `(por caudal bastaba${opcion.unidadesPorCaudal === 1 ? "" : "n"} ${opcion.unidadesPorCaudal}).`
+    );
+  }
+  if (manda === "area") {
+    lineas.push(
+      `Cada ${codigo} cubre unos ${fmt1(opcion.coberturaM2)} m² y el local mide ${fmt0(resultado.area)} m², así que hacen falta ${opcion.unidadesPorArea} ` +
+        `para que el aire llegue a todo el espacio (por caudal bastaba${opcion.unidadesPorCaudal === 1 ? "" : "n"} ${opcion.unidadesPorCaudal}).`
+    );
   }
 
   // 3. Por qué esta opción y no otra.
@@ -341,7 +384,9 @@ export function explicarEleccion({ resultado, opcion, renovaciones, nivelRuidoMa
   if (esRecomendado) {
     const siguiente = opciones.find((o) => o !== opcion);
     if (siguiente) {
-      let alternativa = `Alternativa: ${etiquetaVenta(siguiente)} × ${siguiente.unidades} (${fmt0(siguiente.exceso * 100)} % sobre lo necesario).`;
+      let alternativa = porArea(siguiente)
+        ? `Alternativa: ${etiquetaVenta(siguiente)} × ${siguiente.unidades}.`
+        : `Alternativa: ${etiquetaVenta(siguiente)} × ${siguiente.unidades} (${fmt0(siguiente.exceso * 100)} % sobre lo necesario).`;
       // Diferencia según el tipo y el control del catálogo (ej. VP-16C de pared de cordón, VP-16CR de pared con control remoto).
       if (opcion.tipo && siguiente.tipo && opcion.tipo !== siguiente.tipo) {
         alternativa += ` La diferencia es que el ${nombreDe(siguiente)} es ${descripcionModelo(siguiente)} y el ${codigo} es ${descripcionModelo(opcion)}.`;
@@ -361,6 +406,7 @@ const AJUSTES_DIAGNOSTICO = [
   { clave: "nivelRuidoMax", libre: Infinity, motivo: "el nivel de ruido es muy bajo y no cumple las condiciones", accion: "el nivel de ruido" },
   { clave: "voltaje", libre: "Cualquiera", motivo: "la conexión eléctrica elegida no tiene modelos que cumplan las condiciones", accion: "la conexión eléctrica" },
   { clave: "funcion", libre: "cualquiera", motivo: "el alcance requerido no tiene modelos que cumplan las condiciones", accion: "el alcance requerido" },
+  { clave: "montaje", libre: "cualquiera", motivo: "el tipo de ventilador elegido no tiene modelos que cumplan las condiciones", accion: "el tipo de ventilador" },
   { clave: "linea", libre: "todas", motivo: "la línea de ventiladores elegida no tiene modelos que cumplan las condiciones", accion: "la línea de ventiladores" },
 ];
 
