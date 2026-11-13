@@ -1,6 +1,6 @@
 [
-  { "id": "libre", "etiqueta": "No hay personas (sin límite de ruido)", "maxNivel": null },
-  { "id": "moderado", "etiqueta": "Sí, trabajando (hasta nivel 10)", "maxNivel": 10 },
-  { "id": "bajo", "etiqueta": "Sí, con atención al público u oficina (hasta nivel 7)", "maxNivel": 7 },
-  { "id": "personalizado", "etiqueta": "Personalizado (elegir nivel de 1 a 15)", "maxNivel": null }
+  { "id": "libre", "etiqueta": "No hay personas", "maxNivel": null },
+  { "id": "moderado", "etiqueta": "Sí, trabajando", "maxNivel": 10 },
+  { "id": "bajo", "etiqueta": "Sí, con atención al público u oficina", "maxNivel": 7 },
+  { "id": "personalizado", "etiqueta": "Personalizado", "maxNivel": null }
 ]
