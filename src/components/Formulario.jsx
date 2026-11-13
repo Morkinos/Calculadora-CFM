@@ -15,6 +15,14 @@ const ALCANCES = [
   ["ambas", "Ambas"],
 ];
 
+// Tipo de ventilador según su instalación (campo "montaje" de ventiladores.json).
+const MONTAJES = [
+  ["cualquiera", "Cualquiera"],
+  ["pared", "Pared"],
+  ["piso", "Piso"],
+  ["techo", "Techo"],
+];
+
 const LINEAS = [
   ["industrial", "Industrial"],
   ["domestica", "Doméstica"],
@@ -53,12 +61,16 @@ export default function Formulario({ form, setForm, locales, nivelesRuido, escal
   // Ajustes avanzados que no están en su valor por defecto (para avisar que hay filtros activos aunque el bloque esté cerrado).
   const avanzadosActivos = [
     form.linea !== "todas",
+    form.montaje !== "cualquiera",
     form.altoMin.trim() !== "",
     usaManual,
     form.funcion !== "cualquiera",
     form.voltaje !== "Cualquiera",
     form.cobertura !== 100,
   ].filter(Boolean).length;
+
+  // Opción de personas sugerida para el tipo de local elegido (campo "personas" de locales.json).
+  const sugeridoPersonas = local?.personas ? nivelesRuido.find((r) => r.id === local.personas)?.etiqueta : null;
 
   const botones = (opciones, clave, extra = {}) =>
     opciones.map(([id, texto]) => (
@@ -116,11 +128,13 @@ export default function Formulario({ form, setForm, locales, nivelesRuido, escal
           id="local"
           value={form.local}
           onChange={(e) => {
-            // Al cambiar el tipo de local, la pregunta de personas toma el valor típico de ese local (se puede cambiar después).
-            const elegido = locales.find((l) => l.nombre === e.target.value);
-            setForm((f) => ({ ...f, local: e.target.value, ruido: elegido?.personas ?? f.ruido }));
+            setForm((f) => ({ ...f, local: e.target.value }));
           }}
+          required
         >
+          <option value="" disabled>
+            Seleccionar…
+          </option>
           {locales.map((l) => (
             <option key={l.nombre} value={l.nombre}>
               {l.nombre} ({l.min}–{l.max} ren/h)
@@ -152,7 +166,10 @@ export default function Formulario({ form, setForm, locales, nivelesRuido, escal
             : "Úselo cuando el tipo de local no lo refleja, por ejemplo una bodega de químicos: humo, vapores, polvo o gases requieren más renovaciones."
         }
       >
-        <select id="contaminante" value={form.contaminante} onChange={set("contaminante")}>
+        <select id="contaminante" value={form.contaminante} onChange={set("contaminante")} required>
+          <option value="" disabled>
+            Seleccionar…
+          </option>
           {contaminantes.map((c) => (
             <option key={c.id} value={c.id}>
               {c.etiqueta}
@@ -166,7 +183,10 @@ export default function Formulario({ form, setForm, locales, nivelesRuido, escal
         etiqueta="¿El local tiene entrada de aire?"
         ayuda="Con entrada de aire (aberturas), el aire caliente sale por ellas y basta un inyector. Sin entrada, los axiales se instalan en pareja: uno inyecta y otro extrae."
       >
-        <select id="entradaAire" value={form.entradaAire} onChange={set("entradaAire")}>
+        <select id="entradaAire" value={form.entradaAire} onChange={set("entradaAire")} required>
+          <option value="" disabled>
+            Seleccionar…
+          </option>
           <option value="si">Sí, tiene entrada de aire</option>
           <option value="no">No, es un espacio cerrado</option>
         </select>
@@ -176,9 +196,16 @@ export default function Formulario({ form, setForm, locales, nivelesRuido, escal
       <Campo
         id="ruido"
         etiqueta="¿Hay personas en el local?"
-        ayuda="Se llena según el tipo de local; cámbielo si no aplica. Con personas se limita el ruido por unidad (escala de VEGGA, 1 a 15)."
+        ayuda={
+          sugeridoPersonas
+            ? `Sugerido para ${local.nombre.toLowerCase()}: «${sugeridoPersonas}». Con personas se descartan los modelos más ruidosos.`
+            : "Con personas se descartan los modelos más ruidosos."
+        }
       >
-        <select id="ruido" value={form.ruido} onChange={set("ruido")}>
+        <select id="ruido" value={form.ruido} onChange={set("ruido")} required>
+          <option value="" disabled>
+            Seleccionar…
+          </option>
           {nivelesRuido.map((r) => (
             <option key={r.id} value={r.id}>
               {r.etiqueta}
@@ -187,7 +214,7 @@ export default function Formulario({ form, setForm, locales, nivelesRuido, escal
         </select>
       </Campo>
 
-      {form.ruido !== "libre" && (
+      {form.ruido !== "" && form.ruido !== "libre" && (
         <Campo
           id="personas"
           etiqueta="Cantidad de personas (aprox., opcional)"
@@ -203,7 +230,7 @@ export default function Formulario({ form, setForm, locales, nivelesRuido, escal
             <option value="">Sin límite</option>
             {escalaRuido.map((e) => (
               <option key={e.nivel} value={e.nivel}>
-                {e.nivel} · {e.nombre} ({e.db})
+                {e.nivel} · {e.nombre}
               </option>
             ))}
           </select>
@@ -226,6 +253,16 @@ export default function Formulario({ form, setForm, locales, nivelesRuido, escal
             <div className="segmentado" role="group" aria-labelledby="t-linea">
               {botones(LINEAS, "linea")}
             </div>
+          </div>
+
+          <div className="campo">
+            <span className="etiqueta-campo" id="t-montaje">
+              Tipo de ventilador
+            </span>
+            <div className="segmentado segmentado-4" role="group" aria-labelledby="t-montaje">
+              {botones(MONTAJES, "montaje")}
+            </div>
+            <small>Piso incluye los de pie y de torre. Los axiales se instalan en pared.</small>
           </div>
 
           <Campo
@@ -277,17 +314,6 @@ export default function Formulario({ form, setForm, locales, nivelesRuido, escal
               />
             </Campo>
 
-          <details className="escala ancho-completo">
-            <summary>Ver escala de ruido (1 a 15)</summary>
-            <ol>
-              {escalaRuido.map((e) => (
-                <li key={e.nivel}>
-                  <strong>{e.nivel} · {e.nombre}</strong> <span>{e.db}</span>
-                  <small>{e.ejemplo}</small>
-                </li>
-              ))}
-            </ol>
-          </details>
         </div>
       </details>
     </section>
